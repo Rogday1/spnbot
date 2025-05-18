@@ -1,9 +1,8 @@
-from sqlalchemy import Column, Integer, Date, BigInteger, JSON, Text
+from sqlalchemy import Column, Integer, Date, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import date
-import json
 
-from src.database.db import Base, is_sqlite
+from src.database.db import Base
 
 
 class DailyStats(Base):
@@ -14,8 +13,8 @@ class DailyStats(Base):
     total_wins = Column(BigInteger, default=0)  # Общая сумма выигрышей за день
     spins_count = Column(Integer, default=0)    # Количество прокрутов за день
     
-    # Используем JSONB для PostgreSQL и TEXT для SQLite
-    sector_stats = Column(JSONB if not is_sqlite else Text, nullable=True)
+    # Используем JSONB для PostgreSQL
+    sector_stats = Column(JSONB, nullable=True)
     
     def __repr__(self):
         return f"<DailyStats(date={self.date}, total_wins={self.total_wins}, spins_count={self.spins_count})>"

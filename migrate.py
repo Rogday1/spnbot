@@ -2,53 +2,54 @@ import asyncio
 import logging
 import sys
 import argparse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+import os
+from alembic.config import Config
+from alembic import command
 
-from src.database.db import init_db, Base, engine
-from src.database.models import User, Game, DailyStats
+from src.database.db import init_db
+from run_migrations import run_migrations
 
 
-async def create_tables(recreate_daily_stats=False):
+async def setup_database(recreate_daily_stats=False):
     """
-    Создает все таблицы в базе данных.
+    Настраивает базу данных с использованием Alembic миграций.
     
     Args:
         recreate_daily_stats (bool): Пересоздать таблицу daily_stats
     """
     try:
-        logging.info("Создание таблиц в базе данных...")
+        logging.info("Настройка базы данных PostgreSQL...")
+        
+        # Применяем миграции с помощью Alembic
+        success = run_migrations(upgrade=True)
+        
+        if not success:
+            logging.error("Ошибка при применении миграций")
+            return False
         
         # Если нужно пересоздать таблицу daily_stats
         if recreate_daily_stats:
             logging.info("Удаление таблицы daily_stats...")
-            async with engine.begin() as conn:
-                await conn.execute(text("DROP TABLE IF EXISTS daily_stats"))
-                logging.info("Таблица daily_stats удалена")
-        
-        async with engine.begin() as conn:
-            # Создаем таблицы
-            await conn.run_sync(Base.metadata.create_all)
-        
-        logging.info("Таблицы успешно созданы")
-        
-        # Проверяем, что таблицы действительно созданы
-        db_session = await init_db()
-        
-        try:
-            # Проверяем наличие таблиц
+            db_session = await init_db()
             async with db_session() as session:
-                session: AsyncSession
-                # Здесь можно выполнить проверочные запросы к базе данных
-                pass
-                
-            logging.info("Подключение к базе данных успешно проверено")
-        except Exception as e:
-            logging.error(f"Ошибка при проверке подключения к базе данных: {e}")
+                await session.execute("DROP TABLE IF EXISTS daily_stats CASCADE")
+                await session.commit()
+                logging.info("Таблица daily_stats удалена")
+            
+            # Применяем миграции снова для создания таблицы daily_stats
+            success = run_migrations(upgrade=True)
+            if not success:
+                logging.error("Ошибка при повторном применении миграций")
+                return False
+        
+        # Инициализируем соединение с базой данных
+        await init_db()
+        logging.info("База данных успешно настроена")
+        return True
     
     except Exception as e:
-        logging.error(f"Ошибка при создании таблиц: {e}")
-        raise
+        logging.error(f"Ошибка при настройке базы данных: {e}")
+        return False
 
 
 if __name__ == "__main__":
@@ -59,9 +60,18 @@ if __name__ == "__main__":
     )
     
     # Парсинг аргументов командной строки
-    parser = argparse.ArgumentParser(description="Миграция базы данных")
+    parser = argparse.ArgumentParser(description="Миграция базы данных PostgreSQL")
     parser.add_argument("--recreate-daily-stats", action="store_true", help="Пересоздать таблицу daily_stats")
+    parser.add_argument("--debug", action="store_true", help="Включить режим отладки")
     args = parser.parse_args()
     
-    # Запуск миграции
-    asyncio.run(create_tables(recreate_daily_stats=args.recreate_daily_stats)) 
+    # Устанавливаем уровень логирования
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logging.debug("Включен режим отладки")
+    
+    # Запуск настройки базы данных
+    success = asyncio.run(setup_database(recreate_daily_stats=args.recreate_daily_stats))
+    
+    # Выход с соответствующим кодом
+    sys.exit(0 if success else 1) 

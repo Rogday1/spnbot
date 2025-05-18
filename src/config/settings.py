@@ -54,7 +54,7 @@ WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", 8000))
 WEBAPP_PUBLIC_URL = os.getenv("WEBAPP_PUBLIC_URL", "")
 
 # Настройки базы данных
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/data/spin_bot.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/spin_bot")
 
 # Прямая проверка файла .env (без использования уже загруженных переменных)
 if env_path.exists():
