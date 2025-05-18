@@ -1,0 +1,10 @@
+__pycache__
+.env
+*.db
+*.log
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.bak

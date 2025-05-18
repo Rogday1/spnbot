@@ -1,0 +1,18 @@
+[project]
+name = "SpinBot"
+version = "2.5.6"
+description = "Spin Bot for Artёmka"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.19.0",
+    "aiosqlite>=0.21.0",
+    "asyncpg>=0.30.0",
+    "dotenv>=0.9.9",
+    "fastapi>=0.115.12",
+    "pydantic>=2.11.3",
+    "psycopg2-binary>=2.9.9",
+    "pyngrok>=7.2.4",
+    "sqlalchemy>=2.0.40",
+    "uvicorn>=0.34.0",
+]

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="MobileOptimized" content="176">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Spin Bot - Колесо Фортуны</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
+    <link rel="stylesheet" href="/static/game/style.css?v=202404241300">
+    <!-- Встроенные стили для нижней навигационной панели и исправления таймера -->
+    <style>
+        /* Нижняя навигационная панель - прямые стили для гарантированного применения */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            background-color: rgba(109, 40, 217, 0.75) !important; /* Полупрозрачный фиолетовый цвет */
+            backdrop-filter: blur(5px) !important; /* Добавляем эффект размытия */
+            -webkit-backdrop-filter: blur(5px) !important;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 50;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.2) !important;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-bottom: none;
+            padding: 0 10px;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            color: #FFFFFF !important;
+            text-align: center;
+            cursor: pointer;
+            flex: 1;
+            max-width: 120px;
+        }
+        
+        .nav-text {
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        
+        .nav-item .material-icons-round {
+            font-size: 28px;
+            margin-bottom: 4px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        
+        .nav-item.active {
+            color: #FFFFFF !important;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+        }
+        
+        .nav-item.active .material-icons-round {
+            transform: scale(1.1);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+        }
+
+        /* Исправления для размера и стилей таймера */
+        .wheel-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .info-item {
+            background-color: var(--bg-color);
+            padding: 10px 15px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: var(--text-light);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            font-weight: 500;
+            flex-grow: 1;
+            flex-basis: 0;
+            min-width: 0;
+        }
+        
+        /* Общие стили для всех элементов информации */
+        .info-item.tickets,
+        .info-item.nickname,
+        .info-item.timer {
+            background-color: var(--bg-color);
+            flex: 1 1 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Стили для таймера - убираем специфичные размеры и унифицируем цвет */
+        .info-item.timer {
+            transition: all 0.5s ease;
+            border-radius: 10px;
+        }
+        
+        /* Скрытый таймер (когда у пользователя есть билеты) */
+        .info-item.timer.hidden-timer {
+            max-width: 0;
+            padding: 0;
+            margin: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* Стили для активного таймера обратного отсчета */
+        .info-item.timer.active-timer {
+            background-color: rgba(123, 31, 162, 0.2);
+            border: 1px solid rgba(123, 31, 162, 0.3);
+            animation: timerGlow 2s infinite alternate;
+            opacity: 1;
+        }
+
+        /* Адаптивные стили для мобильных устройств */
+        @media (max-width: 480px) {
+            .wheel-info {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            .info-item {
+                flex: 1 1 calc(50% - 8px);
+                min-width: 0;
+            }
+            
+            /* Новое правило: элемент, переходящий на новую строку, занимает всю ширину */
+            .info-item:last-child:nth-child(2n+1) {
+                flex: 1 1 100%;
+            }
+            
+            .info-item.timer {
+                order: 3;
+            }
+        }
+    </style>
+    <!-- Telegram WebApp API -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Обработчик инициализации Telegram WebApp -->
+    <script>
+        try {
+            // Инициализируем Telegram WebApp 
+            if (window.Telegram && window.Telegram.WebApp) {
+                // Сообщаем Telegram, что приложение готово к отображению
+                window.Telegram.WebApp.ready();
+                // Растягиваем приложение на весь экран
+                window.Telegram.WebApp.expand();
+                // Устанавливаем цвета в соответствии с темой Telegram
+                document.documentElement.setAttribute('data-theme', 
+                    window.Telegram.WebApp.colorScheme || 'light');
+                console.log('Telegram WebApp инициализирован успешно');
+                
+                // Проверка подписки пользователя на требуемые каналы
+                checkSubscription();
+                
+                window.tgInitSuccess = true;
+            } else {
+                console.warn('Telegram WebApp API не обнаружен, возможно, приложение открыто вне Telegram');
+                window.tgInitSuccess = false;
+            }
+        } catch (e) {
+            console.error('Ошибка при инициализации Telegram WebApp:', e);
+            window.tgInitSuccess = false;
+        }
+        
+        // Функция проверки подписки пользователя на требуемые телеграм-каналы
+        function checkSubscription() {
+            try {
+                const userData = window.Telegram.WebApp.initDataUnsafe;
+                
+                if (!userData || !userData.user) {
+                    console.warn('Не удалось получить данные пользователя');
+                    return;
+                }
+                
+                const userId = userData.user.id;
+                
+                // Отправляем запрос на сервер для проверки подписки
+                fetch('/api/user/check_subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        initData: window.Telegram.WebApp.initData
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.subscribed) {
+                        // Показываем уведомление о необходимости подписаться на каналы
+                        showSubscriptionModal(data.channels);
+                    } else {
+                        console.log('Пользователь подписан на все требуемые каналы');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при проверке подписки:', error);
+                });
+            } catch (e) {
+                console.error('Ошибка при проверке подписки:', e);
+            }
+        }
+        
+        // Функция отображения модального окна с требованиями подписки
+        function showSubscriptionModal(channels) {
+            const modal = document.createElement('div');
+            modal.className = 'modal subscription-modal active';
+            
+            let channelsHtml = '';
+            if (channels && channels.length > 0) {
+                channelsHtml = '<div class="subscription-channels">';
+                channels.forEach(channel => {
+                    channelsHtml += `
+                        <div class="subscription-channel-item">
+                            <span class="material-icons-round">campaign</span>
+                            <a href="${channel.url}" target="_blank" class="channel-link">${channel.title}</a>
+                        </div>
+                    `;
+                });
+                channelsHtml += '</div>';
+            }
+            
+            modal.innerHTML = `
+                <div class="modal-content subscription-content">
+                    <div class="modal-header">
+                        <h3>Требуется подписка</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p>Для использования приложения необходимо быть подписанным на все каналы:</p>
+                        ${channelsHtml}
+                        <p class="subscription-note">После подписки нажмите кнопку проверки</p>
+                        <button id="check-subscription-btn" class="submit-button">Я подписался, проверить</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            document.getElementById('check-subscription-btn').addEventListener('click', function() {
+                modal.remove();
+                checkSubscription();
+            });
+        }
+    </script>
+    
+    <style>
+        /* Стили для модального окна подписки */
+        .subscription-modal {
+            z-index: 1000;
+        }
+        
+        .subscription-content {
+            max-width: 450px;
+        }
+        
+        .subscription-channels {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .subscription-channel-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background-color: rgba(123, 31, 162, 0.1);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .subscription-channel-item:hover {
+            background-color: rgba(123, 31, 162, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .channel-link {
+            color: var(--primary-dark);
+            text-decoration: none;
+            font-weight: 600;
+            flex: 1;
+        }
+        
+        .subscription-note {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin: 15px 0;
+            font-style: italic;
+        }
+        
+        #check-subscription-btn {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="content-wrapper">
+            <div class="tab-content" id="tab-wheel" style="display: block;">
+                <div class="container">
+                    <h1>Колесо Фортуны</h1>
+                    
+                    <div class="game-container">
+                        <div class="wheel-info">
+                            <div class="info-item tickets">
+                                <span class="material-icons-round">local_activity</span>
+                                <span>Билеты: <span id="tickets-count">0</span></span>
+                            </div>
+                            <div class="info-item nickname">
+                                <span class="material-icons-round">person</span>
+                                <span id="current-nickname">Гость</span>
+                                <button id="change-nickname-btn" class="change-nickname-btn">
+                                    <span class="material-icons-round">edit</span>
+                                </button>
+                            </div>
+                            <div class="info-item timer">
+                                <span class="material-icons-round">hourglass_top</span>
+                                <span id="timer">23:26</span>
+                            </div>
+                        </div>
+                        
+                        <div class="wheel-container">
+                            <div class="wheel-marker"></div>
+                            <div class="wheel" id="wheel">
+                                <!-- Сегменты колеса будут созданы скриптом -->
+                            </div>
+                            <div class="wheel-center"></div>
+                        </div>
+                        
+                        <button id="spin-button">Крутить колесо</button>
+                        
+                        <div class="score">
+                            Ваш баланс: <span id="points" class="score-amount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="tab-leaders" style="display: none;">
+                <div class="container">
+                    <h1>Лидеры</h1>
+                    <div class="card-container">
+                        <div class="leaders-list">
+                            <div class="leader-item">
+                                <div class="leader-rank">1</div>
+                                <div class="leader-info">
+                                    <div class="leader-name">Александр</div>
+                                    <div class="leader-score">Баланс: 1250</div>
+                                </div>
+                            </div>
+                            <div class="leader-item">
+                                <div class="leader-rank">2</div>
+                                <div class="leader-info">
+                                    <div class="leader-name">Мария</div>
+                                    <div class="leader-score">Баланс: 980</div>
+                                </div>
+                            </div>
+                            <div class="leader-item">
+                                <div class="leader-rank">3</div>
+                                <div class="leader-info">
+                                    <div class="leader-name">Иван</div>
+                                    <div class="leader-score">Баланс: 740</div>
+                                </div>
+                            </div>
+                            <div class="leader-item">
+                                <div class="leader-rank">4</div>
+                                <div class="leader-info">
+                                    <div class="leader-name">Анна</div>
+                                    <div class="leader-score">Баланс: 625</div>
+                                </div>
+                            </div>
+                            <div class="leader-item">
+                                <div class="leader-rank">5</div>
+                                <div class="leader-info">
+                                    <div class="leader-name">Дмитрий</div>
+                                    <div class="leader-score">Баланс: 510</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="tab-referral" style="display: none;">
+                <div class="container">
+                    <h1>Реферальная ссылка</h1>
+                    <div class="card-container">
+                        <div class="referral-info">
+                            <p class="referral-text" style="color: #4a148c; font-weight: 600; text-shadow: 0px 0.5px 0.5px rgba(0, 0, 0, 0.2);">Поделитесь своей реферальной ссылкой с друзьями и получите бесплатный билет за каждого приглашённого!</p>
+                            <div class="referral-link-container">
+                                <input type="text" id="referral-link" class="referral-link" style="color: #4a148c; font-weight: 600;" value="https://t.me/smarty_gector_ai_bot?start=ref123456" readonly>
+                                <button id="copy-link" class="copy-button">
+                                    <span class="material-icons-round">content_copy</span>
+                                </button>
+                            </div>
+                            <div class="referral-stats">
+                                <div class="stat-item">
+                                    <div class="stat-value">0</div>
+                                    <div class="stat-label" style="color: #4a148c; font-weight: 600;">Приглашено друзей</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="bottom-nav">
+            <div class="nav-item active" data-tab="tab-wheel">
+                <span class="material-icons-round">casino</span>
+                <span class="nav-text">Колесо Фортуны</span>
+            </div>
+            <div class="nav-item" data-tab="tab-leaders">
+                <span class="material-icons-round">leaderboard</span>
+                <span class="nav-text">Лидеры</span>
+            </div>
+            <div class="nav-item" data-tab="tab-referral">
+                <span class="material-icons-round">share</span>
+                <span class="nav-text">Реферальная ссылка</span>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Модальное окно для ввода никнейма -->
+    <div id="nickname-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Введите свой никнейм</h3>
+                <span class="material-icons-round close-modal" id="close-nickname-modal">close</span>
+            </div>
+            <p class="modal-description">Ваш никнейм будет отображаться в таблице лидеров и будет виден другим пользователям.</p>
+            <div class="modal-body">
+                <form id="nickname-form">
+                    <div class="form-group">
+                        <label for="nickname-input">Никнейм:</label>
+                        <input type="text" id="nickname-input" maxlength="20" placeholder="Введите никнейм (мин. 3 символа)" required>
+                        <div id="nickname-error" class="error-message"></div>
+                    </div>
+                    <button type="submit" class="submit-button">Сохранить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="win-message" id="win-message">
+        <div class="win-content">
+            <div class="win-title">Поздравляем!</div>
+            <div>Вы выиграли</div>
+            <div class="win-amount" id="win-amount">0</div>
+            <div>на ваш баланс!</div>
+            <button class="win-button" id="ok-button">Отлично!</button>
+        </div>
+    </div>
+
+    <script src="/static/game/script.js?v=202404241300"></script>
+</body>
+</html> 
