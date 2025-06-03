@@ -14,6 +14,43 @@ const state = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Функция для принудительного обновления кеша стилей
+    function forceStyleRefresh() {
+        const links = document.querySelectorAll('link[rel="stylesheet"]');
+        links.forEach(link => {
+            const href = link.href;
+            if (href.includes('/static/game/')) {
+                const newHref = href.split('?')[0] + '?nocache=' + new Date().getTime();
+                link.href = newHref;
+                console.log('Обновлен стиль:', newHref);
+            }
+        });
+        
+        // Проверяем, применились ли стили корректно
+        setTimeout(() => {
+            const winSubtitle = document.querySelector('.win-subtitle');
+            if (winSubtitle) {
+                const style = window.getComputedStyle(winSubtitle);
+                const color = style.getPropertyValue('color');
+                
+                // Если цвет не соответствует ожидаемому (не белый), принудительно перезагружаем страницу
+                if (color && !color.includes('255, 255, 255') && !color.includes('rgb(255, 255, 255)')) {
+                    console.log('Стили не применились корректно, перезагружаем страницу...');
+                    
+                    // Добавляем параметр для предотвращения кеширования
+                    const currentUrl = window.location.href;
+                    const newUrl = currentUrl.split('?')[0] + '?t=' + new Date().getTime();
+                    
+                    // Перезагружаем страницу с новым параметром
+                    window.location.href = newUrl;
+                }
+            }
+        }, 1000);
+    }
+    
+    // Принудительно обновляем стили при загрузке страницы
+    forceStyleRefresh();
+    
     // Кэшируем все DOM-элементы при загрузке страницы
     cacheDOM();
     
@@ -49,6 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Получаем группы элементов
         DOM.navItems = document.querySelectorAll('.nav-item');
         DOM.tabContents = document.querySelectorAll('.tab-content');
+        
+        // Явно получаем кнопку закрытия модального окна
+        DOM.closenicknamebtn = document.getElementById('close-nickname-modal');
     }
     
     // Функция инициализации приложения
@@ -127,13 +167,65 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
+        // Обработчик кнопки "Поделиться в Telegram"
+        const shareButton = document.getElementById('share-telegram');
+        if (shareButton) {
+            shareButton.addEventListener('click', () => {
+                const referralLink = DOM.referrallink ? DOM.referrallink.value : '';
+                if (referralLink) {
+                    // Проверяем, что ссылка содержит префикс ref
+                    if (!referralLink.includes('?start=ref')) {
+                        console.error('Ошибка: реферальная ссылка не содержит префикс ref');
+                        // Пытаемся исправить ссылку
+                        const userId = state.userId || getUserId();
+                        const botUsername = 'smarty_gector_ai_bot';
+                        const correctedLink = `https://t.me/${botUsername}?start=ref${userId}`;
+                        console.log(`Исправлена реферальная ссылка: ${correctedLink}`);
+                        
+                        if (DOM.referrallink) {
+                            DOM.referrallink.value = correctedLink;
+                        }
+                    }
+                    
+                    const shareLink = DOM.referrallink ? DOM.referrallink.value : referralLink;
+                    const shareText = 'Присоединяйся к Spin Bot и получай бонусы!';
+                    
+                    // Если приложение запущено внутри Telegram, используем встроенный метод
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(shareText)}`);
+                    } else {
+                        // Запасной вариант - открываем ссылку в новой вкладке
+                        window.open(`https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
+                    }
+                    
+                    // Анимация кнопки для обратной связи
+                    const originalText = shareButton.innerHTML;
+                    shareButton.innerHTML = '<span class="material-icons-round">check_circle</span> Отправлено!';
+                    
+                    setTimeout(() => {
+                        shareButton.innerHTML = originalText;
+                    }, 2000);
+                }
+            });
+        }
+        
         // Настройка формы никнейма
         if (DOM.changenicknamebtn) {
             DOM.changenicknamebtn.addEventListener('click', showNicknameModal);
         }
         
+        // Исправленная обработка кнопки закрытия модального окна
+        DOM.closenicknamebtn = document.getElementById('close-nickname-modal');
         if (DOM.closenicknamebtn) {
             DOM.closenicknamebtn.addEventListener('click', hideNicknameModal);
+        } else {
+            console.error('Не найдена кнопка закрытия модального окна никнейма');
+            // Пробуем добавить обработчик по классу
+            const closeModalBtn = document.querySelector('.close-modal');
+            if (closeModalBtn) {
+                closeModalBtn.addEventListener('click', hideNicknameModal);
+                console.log('Обработчик добавлен к элементу по классу .close-modal');
+            }
         }
         
         window.addEventListener('click', (event) => {
@@ -205,56 +297,93 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Обработчик нажатия на кнопку "Крутить"
-    function handleSpin() {
+    async function handleSpin() {
         if (state.isSpinning || state.tickets <= 0) return;
         
+        // Устанавливаем флаг вращения и блокируем кнопку
         state.isSpinning = true;
         DOM.spinbutton.disabled = true;
         
-        // Выбираем случайный сегмент для выигрыша
-        const segmentCount = sectors.length;
-        const segmentAngle = 360 / segmentCount;
-        const winningSegmentIndex = Math.floor(Math.random() * segmentCount);
-        const winningValue = sectors[winningSegmentIndex].value;
-        
-        // Вычисляем угол для остановки колеса
-        const stopAngle = segmentAngle * winningSegmentIndex + segmentAngle / 2;
-        
-        // Добавляем полные обороты для эффектности (5-7 оборотов)
-        const rotations = 5 + Math.floor(Math.random() * 3);
-        const fullRotationsAngle = rotations * 360;
-        
-        // Конечный угол: полные обороты + угол до целевого сегмента
-        const spinAngle = -(fullRotationsAngle + stopAngle);
-        
-        // Уменьшаем количество билетов в интерфейсе
-        state.tickets--;
-        if (DOM.ticketscount) {
-            DOM.ticketscount.textContent = state.tickets;
-        }
-        
-        // Получаем маркер (стрелку)
-        const marker = document.querySelector('.wheel-marker');
-        if (marker) {
-            // Добавляем класс для состояния вращения
-            marker.classList.add('spinning');
-        }
-        
-        // Анимируем вращение колеса
-        const svg = DOM.wheel.querySelector('svg');
-        svg.style.transition = 'transform 6s cubic-bezier(0.32, 0.64, 0.23, 1)';
-        svg.style.transform = `rotate(${spinAngle}deg)`;
-        
-        // Короткий звуковой сигнал при начале вращения (если поддерживается)
         try {
-            const startSound = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMYXZjNTguMTQuMTAwAAA=');
-            startSound.play().catch(() => {});
-        } catch(e) {}
-        
-        // Получаем выигрыш с небольшой задержкой
-        setTimeout(() => {
+            // Получаем ID пользователя
+            const userId = state.userId || getUserId();
+            if (!userId) {
+                showError("Не удалось аутентифицировать пользователя");
+                state.isSpinning = false;
+                DOM.spinbutton.disabled = false;
+                return;
+            }
+            
+            // Сначала запрашиваем результат с сервера
+            const prediction = await makeApiRequest(
+                `/api/spin/predict/${userId}`,
+                'POST',
+                {}
+            );
+            
+            if (!prediction.success) {
+                // Если не удалось получить предсказание, показываем ошибку
+                showError(prediction.message || "Не удалось получить результат прокрутки");
+                state.isSpinning = false;
+                DOM.spinbutton.disabled = false;
+                return;
+            }
+            
+            // Получаем результат и seed для анимации
+            const winningValue = parseInt(prediction.result);
+            const seed = prediction.seed;
+            
+            // Используем seed для детерминированной генерации случайных чисел
+            const rng = new Math.seedrandom(seed.toString());
+            
+            // Находим индекс сектора с нужным значением
+            const winningSegmentIndex = sectors.findIndex(sector => sector.value === winningValue);
+            if (winningSegmentIndex === -1) {
+                showError("Ошибка при определении сектора");
+                state.isSpinning = false;
+                DOM.spinbutton.disabled = false;
+                return;
+            }
+            
+            // Вычисляем угол для остановки колеса
+            const segmentCount = sectors.length;
+            const segmentAngle = 360 / segmentCount;
+            const stopAngle = segmentAngle * winningSegmentIndex + segmentAngle / 2;
+            
+            // Добавляем полные обороты для эффектности (5-7 оборотов)
+            const rotations = 5 + Math.floor(rng() * 3);
+            const fullRotationsAngle = rotations * 360;
+            
+            // Конечный угол: полные обороты + угол до целевого сегмента
+            const spinAngle = -(fullRotationsAngle + stopAngle);
+            
+            // Уменьшаем количество билетов в интерфейсе (визуально)
+            state.tickets--;
+            if (DOM.ticketscount) {
+                DOM.ticketscount.textContent = state.tickets;
+            }
+            
+            // Получаем маркер (стрелку)
+            const marker = document.querySelector('.wheel-marker');
+            if (marker) {
+                // Добавляем класс для состояния вращения
+                marker.classList.add('spinning');
+            }
+            
+            // Анимируем вращение колеса
+            const svg = DOM.wheel.querySelector('svg');
+            svg.style.transition = 'transform 6s cubic-bezier(0.32, 0.64, 0.23, 1)';
+            svg.style.transform = `rotate(${spinAngle}deg)`;
+            
+            // Короткий звуковой сигнал при начале вращения (если поддерживается)
+            try {
+                const startSound = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMYXZjNTguMTQuMTAwAAA=');
+                startSound.play().catch(() => {});
+            } catch(e) {}
+            
+            // Ожидаем завершения анимации и отправляем результат на сервер
             setTimeout(async () => {
-                // Отправляем результат на сервер
+                // Отправляем результат на сервер для подтверждения
                 console.log(`Отправляем результат: ${winningValue}, тип: ${typeof winningValue}`);
                 const result = await sendSpinResult(winningValue);
                 
@@ -269,7 +398,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // Показываем сообщение о выигрыше
                     DOM.winamount.textContent = winningValue;
-                    DOM.winmessage.classList.add('active');
+                    
+                    // Добавляем анимацию появления
+                    setTimeout(() => {
+                        DOM.winmessage.classList.add('active');
+                        
+                        // Добавляем звуковой эффект победы (если поддерживается)
+                        try {
+                            const winSound = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMYXZjNTguMTQuMTAwAAA=');
+                            winSound.play().catch(() => {});
+                        } catch(e) {}
+                    }, 500);
                     
                     // Обновляем отображение баланса
                     if (DOM.points) {
@@ -300,16 +439,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     DOM.spinbutton.disabled = state.tickets <= 0;
                 }
                 
-                // Звуковой сигнал победы (если поддерживается)
-                try {
-                    const winSound = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMYXZjNTguMTQuMTAwAAA=');
-                    winSound.play().catch(() => {});
-                } catch(e) {}
-                
                 // Добавляем проверку билетов и обновление таймера после прокрутки
                 checkTicketsAndUpdateTimer();
-            }, 500);
-        }, 6000);
+            }, 6000);
+        } catch (error) {
+            console.error("Ошибка при прокрутке колеса:", error);
+            showError("Произошла ошибка при прокрутке колеса");
+            state.isSpinning = false;
+            DOM.spinbutton.disabled = false;
+        }
     }
     
     // Функция для получения ID пользователя
@@ -598,28 +736,43 @@ document.addEventListener('DOMContentLoaded', () => {
         // Очищаем текущий список
         leadersList.innerHTML = '';
         
+        // Получаем ID текущего пользователя
+        const currentUserId = getUserId();
+        
         // Добавляем лидеров
         leaders.forEach(leader => {
-            const leaderItem = document.createElement('div');
-            leaderItem.className = 'leader-item';
+            const leaderRow = document.createElement('div');
+            leaderRow.className = 'leader-row';
             
-            leaderItem.innerHTML = `
-                <div class="leader-rank">${leader.rank}</div>
-                <div class="leader-info">
-                    <div class="leader-name" style="color: #4a148c; font-weight: 800; text-shadow: 0px 1px 1px rgba(0, 0, 0, 0.4); letter-spacing: 0.3px;">${leader.name}</div>
-                    <div class="leader-score">Баланс: ${leader.score}</div>
-                </div>
+            // Определяем медаль для первых трех мест
+            let rankPrefix = '';
+            if (leader.rank === 1) rankPrefix = '🥇 ';
+            else if (leader.rank === 2) rankPrefix = '🥈 ';
+            else if (leader.rank === 3) rankPrefix = '🥉 ';
+            
+            // Форматируем числа для более удобного чтения
+            const formattedScore = new Intl.NumberFormat('ru-RU').format(leader.score);
+            
+            // Проверяем, является ли этот лидер текущим пользователем
+            // Предполагаем, что в данных лидера есть поле id, которое можно сравнить с текущим пользователем
+            if (leader.id === currentUserId) {
+                leaderRow.classList.add('current-user');
+            }
+            
+            leaderRow.innerHTML = `
+                <div class="col-rank">${rankPrefix}${leader.rank}</div>
+                <div class="col-name">${leader.name}</div>
+                <div class="col-score">${formattedScore}</div>
             `;
             
-            leadersList.appendChild(leaderItem);
+            leadersList.appendChild(leaderRow);
         });
         
         // Если список пуст, показываем сообщение
         if (leaders.length === 0) {
-            const emptyMessage = document.createElement('div');
-            emptyMessage.className = 'empty-message';
-            emptyMessage.textContent = 'Пока нет данных о лидерах';
-            leadersList.appendChild(emptyMessage);
+            document.querySelector('.leaders-empty').style.display = 'flex';
+        } else {
+            document.querySelector('.leaders-empty').style.display = 'none';
         }
     }
     
@@ -945,9 +1098,35 @@ document.addEventListener('DOMContentLoaded', () => {
         centerCircle.setAttribute("cx", wheelRadius);
         centerCircle.setAttribute("cy", wheelRadius);
         centerCircle.setAttribute("r", "25");
-        centerCircle.setAttribute("fill", "#8B5CF6"); // Фиолетовый цвет для центра колеса
+        
+        // Создаем градиент для центрального круга
+        const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+        gradient.setAttribute("id", "centerGradient");
+        gradient.setAttribute("x1", "0%");
+        gradient.setAttribute("y1", "0%");
+        gradient.setAttribute("x2", "100%");
+        gradient.setAttribute("y2", "100%");
+        
+        const stop1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        stop1.setAttribute("offset", "0%");
+        stop1.setAttribute("stop-color", "#9C27B0");
+        
+        const stop2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        stop2.setAttribute("offset", "100%");
+        stop2.setAttribute("stop-color", "#673AB7");
+        
+        gradient.appendChild(stop1);
+        gradient.appendChild(stop2);
+        
+        // Добавляем градиент в defs
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        defs.appendChild(gradient);
+        svg.appendChild(defs);
+        
+        centerCircle.setAttribute("fill", "url(#centerGradient)");
         centerCircle.setAttribute("stroke", "#FFFFFF");
         centerCircle.setAttribute("stroke-width", "2");
+        centerCircle.setAttribute("filter", "drop-shadow(0 0 10px rgba(156, 39, 176, 0.4))");
         
         svg.appendChild(centerCircle);
         
@@ -1029,6 +1208,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Сбрасываем ошибки
             clearNicknameError();
+            
+            // Дополнительно проверяем работу кнопки закрытия
+            const closeBtn = document.querySelector('#nickname-modal .close-modal');
+            if (closeBtn) {
+                // Удаляем все предыдущие обработчики, чтобы избежать дублирования
+                closeBtn.removeEventListener('click', hideNicknameModal);
+                // Добавляем новый обработчик
+                closeBtn.addEventListener('click', hideNicknameModal);
+                console.log('Добавлен обработчик закрытия при открытии модального окна');
+            }
         }
     }
     
@@ -1058,16 +1247,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Добавим функцию обновления реферальной информации
     async function updateReferralInfo(userId, referralCount) {
         // Обновляем реферальную ссылку
-        if (referralLink) {
+        if (DOM.referrallink) {
             // Обновляем ссылку с актуальным ID пользователя
             const botUsername = 'smarty_gector_ai_bot'; // Можно получать динамически, если нужно
-            referralLink.value = `https://t.me/${botUsername}?start=ref${userId}`;
+            DOM.referrallink.value = `https://t.me/${botUsername}?start=ref${userId}`;
+            
+            // Проверяем, что ссылка сформирована правильно
+            console.log(`Реферальная ссылка обновлена: ${DOM.referrallink.value}`);
+            
+            // Убедимся, что префикс ref присутствует
+            if (!DOM.referrallink.value.includes('?start=ref')) {
+                console.error('Ошибка в формировании реферальной ссылки: отсутствует префикс ref');
+                DOM.referrallink.value = `https://t.me/${botUsername}?start=ref${userId}`;
+            }
         }
         
         // Обновляем счетчик приглашенных друзей
-        const referralCountElement = document.querySelector('.referral-stats .stat-value');
-        if (referralCountElement) {
-            referralCountElement.textContent = referralCount;
+        const invitedCountElement = document.getElementById('invited-count');
+        if (invitedCountElement) {
+            invitedCountElement.textContent = referralCount;
         }
         
         // Получаем и отображаем список рефералов, если мы на вкладке рефералов

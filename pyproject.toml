@@ -1,6 +1,6 @@
 [project]
 name = "SpinBot"
-version = "2.5.6"
+version = "2.6.0"
 description = "Spin Bot for Artёmka"
 readme = "README.md"
 requires-python = ">=3.11"

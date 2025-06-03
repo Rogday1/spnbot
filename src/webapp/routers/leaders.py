@@ -9,6 +9,7 @@ from src.utils.cache import cache
 
 class LeaderData(BaseModel):
     rank: int
+    id: int
     name: str
     score: int
     

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Dict, Any
@@ -8,6 +8,7 @@ from pathlib import Path
 import logging
 import time
 import random
+import re
 
 from src.database.db import get_session
 from src.database.repositories import UserRepository, GameRepository, DailyStatsRepository
@@ -16,6 +17,11 @@ from src.utils.probability_manager import calculate_probabilities, select_winnin
 
 # Получаем абсолютный путь до директории со статическими файлами
 STATIC_DIR = Path(__file__).parent.parent / "static"
+
+# Добавляем текущее время для предотвращения кеширования статических файлов
+def get_cache_buster():
+    """Возвращает текущее время в миллисекундах для предотвращения кеширования."""
+    return str(int(time.time() * 1000))
 
 # Модели Pydantic для API
 class SpinRequest(BaseModel):
@@ -47,12 +53,27 @@ class SpinRequest(BaseModel):
             # Пробрасываем остальные ошибки
             raise
 
+# Новая модель для запроса на получение результата прокрутки перед анимацией
+class SpinPredictionRequest(BaseModel):
+    """Модель для запроса на получение результата прокрутки перед анимацией."""
+    pass
+
 class SpinResult(BaseModel):
     """Модель для ответа на запрос прокрутки."""
     success: bool = Field(..., description="Успешность операции")
     tickets: int = Field(..., description="Оставшееся количество билетов")
     result: Optional[str] = Field(None, description="Результат прокрутки")
     time_until_next_spin: Optional[str] = Field(None, description="Время до следующего бесплатного прокрута")
+    message: Optional[str] = Field(None, description="Сообщение об ошибке или уведомление")
+
+# Новая модель для ответа на запрос предсказания результата прокрутки
+class SpinPredictionResult(BaseModel):
+    """Модель для ответа на запрос предсказания результата прокрутки."""
+    success: bool = Field(..., description="Успешность операции")
+    result: str = Field(..., description="Предсказанный результат прокрутки")
+    seed: int = Field(..., description="Seed для генератора случайных чисел")
+    can_spin: bool = Field(..., description="Может ли пользователь крутить колесо")
+    tickets: int = Field(..., description="Количество доступных билетов")
     message: Optional[str] = Field(None, description="Сообщение об ошибке или уведомление")
 
 # Создаем роутер для game с пустым префиксом, чтобы корректно обрабатывать маршрут /game
@@ -81,9 +102,50 @@ async def game_app(request: Request, t: Optional[int] = Query(None)):
         remote_addr = request.client.host if request.client else "Неизвестный"
         logging.debug(f"Запрос игры от {remote_addr}, User-Agent: {user_agent}")
     
-    response = FileResponse(STATIC_DIR / "game" / "spin_wheel.html")
+    # Читаем HTML файл
+    html_path = STATIC_DIR / "game" / "spin_wheel.html"
+    with open(html_path, "r", encoding="utf-8") as file:
+        html_content = file.read()
+    
+    # Заменяем версионные параметры на текущее время
+    cache_buster = get_cache_buster()
+    
+    # Используем регулярное выражение для замены всех версионных параметров
+    html_content = re.sub(r'\?v=\d+', f'?nocache={cache_buster}', html_content)
+    
+    # Добавляем параметр кеширования для всех ссылок на CSS и JS файлы, даже если у них нет параметра v
+    html_content = re.sub(r'(href|src)="([^"]+\.(css|js))"', f'\\1="\\2?nocache={cache_buster}"', html_content)
+    html_content = re.sub(r'(href|src)="([^"]+\.(css|js))\?v=\d+"', f'\\1="\\2?nocache={cache_buster}"', html_content)
+    html_content = re.sub(r'(href|src)="([^"]+\.(css|js))\?nocache=\d+"', f'\\1="\\2?nocache={cache_buster}"', html_content)
+    
+    # Создаем ответ с HTML контентом
+    response = HTMLResponse(content=html_content)
     
     # Добавляем заголовки для предотвращения кэширования
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    return response
+
+# Маршрут для статических файлов с предотвращением кеширования
+@game_page_router.get("/static/game/{file_path:path}")
+async def serve_static_file(file_path: str):
+    """
+    Обслуживает статические файлы с добавлением заголовков для предотвращения кеширования.
+    
+    Args:
+        file_path (str): Путь к файлу относительно директории static/game
+        
+    Returns:
+        FileResponse: Файл со специальными заголовками
+    """
+    full_path = STATIC_DIR / "game" / file_path
+    
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    
+    response = FileResponse(full_path)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -99,7 +161,7 @@ async def spin_wheel(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Выполняет прокрутку колеса и возвращает результат.
+    Подтверждает результат прокрутки колеса и обновляет данные пользователя.
     
     Args:
         user_id (int): ID пользователя
@@ -143,37 +205,15 @@ async def spin_wheel(
                     message="Недостаточно билетов для прокрутки"
                 )
         
-        # Получаем текущий процент использованного дневного лимита
-        win_percentage = await stats_repo.get_win_percentage()
-        
-        # Рассчитываем текущие вероятности для каждого сектора
-        probabilities = calculate_probabilities(win_percentage)
-        
-        # В режиме отладки логируем информацию о вероятностях
-        if settings.DEBUG:
-            logging.debug(f"Текущий процент использованного лимита: {win_percentage*100:.1f}%")
-            logging.debug(f"Текущие вероятности: {probabilities}")
-        
-        # Проверяем, что результат не подделан
+        # Получаем результат из запроса
         client_result_value = int(spin_data.result)
         
-        # Определяем результат на основе вероятностей
-        server_result_value = select_winning_sector(probabilities)
+        # Используем результат из запроса (предполагается, что он был получен из /spin/predict)
+        result_value = client_result_value
         
-        # В режиме отладки позволяем любой результат, иначе используем серверный
-        if not settings.DEBUG:
-            # Используем результат, определенный сервером
-            result_value = server_result_value
-            
-            # Если клиентский результат не совпадает с серверным, логируем это
-            if client_result_value != result_value:
-                logging.warning(
-                    f"Пользователь {user_id} отправил результат {client_result_value}, "
-                    f"но сервер определил {result_value}"
-                )
-        else:
-            # В режиме отладки используем клиентский результат
-            result_value = client_result_value
+        # В режиме отладки логируем информацию
+        if settings.DEBUG:
+            logging.debug(f"Подтверждение результата прокрутки для пользователя {user_id}: {result_value}")
         
         # Используем прокрут с проверенным результатом
         success = await user_repo.use_spin(user_id, result_value)
@@ -293,6 +333,87 @@ async def get_probabilities(session: AsyncSession = Depends(get_session)):
         
     except Exception as e:
         logging.exception(f"Ошибка при получении вероятностей: {e}")
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
+
+# Новый API-эндпоинт для получения результата прокрутки перед анимацией
+@spin_router.post("/spin/predict/{user_id}", response_model=SpinPredictionResult)
+async def predict_spin_result(
+    user_id: int,
+    request: SpinPredictionRequest = Body(...),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Определяет результат прокрутки колеса до начала анимации.
+    
+    Args:
+        user_id (int): ID пользователя
+        request (SpinPredictionRequest): Пустой запрос для совместимости с API
+        session (AsyncSession): Сессия базы данных
+    
+    Returns:
+        SpinPredictionResult: Предсказанный результат прокрутки и seed для анимации
+    
+    Raises:
+        HTTPException: Ошибка при обработке запроса
+    """
+    try:
+        user_repo = UserRepository(session)
+        stats_repo = DailyStatsRepository(session)
+        
+        # Получаем пользователя
+        user = await user_repo.get_user_by_id(user_id)
+        if not user:
+            logging.warning(f"Пользователь {user_id} не найден при попытке предсказания прокрутки колеса")
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Проверяем, может ли пользователь крутить колесо
+        can_spin = user.can_spin()
+        
+        # Если пользователь может получить бесплатный прокрут, отмечаем это
+        if not can_spin and user.can_get_free_spin():
+            can_spin = True
+            message = "Доступен бесплатный прокрут"
+        else:
+            message = None
+        
+        # Если пользователь не может крутить колесо, возвращаем информацию об этом
+        if not can_spin:
+            return SpinPredictionResult(
+                success=False,
+                result="0",  # По умолчанию возвращаем 0
+                seed=random.randint(1000, 9999),  # Случайный seed для анимации
+                can_spin=False,
+                tickets=user.tickets,
+                message="Недостаточно билетов для прокрутки"
+            )
+        
+        # Получаем текущий процент использованного дневного лимита
+        win_percentage = await stats_repo.get_win_percentage()
+        
+        # Рассчитываем текущие вероятности для каждого сектора
+        probabilities = calculate_probabilities(win_percentage)
+        
+        # Определяем результат на основе вероятностей
+        result_value = select_winning_sector(probabilities)
+        
+        # Генерируем случайный seed для анимации
+        seed = random.randint(1000, 9999)
+        
+        # В режиме отладки логируем информацию
+        if settings.DEBUG:
+            logging.debug(f"Предсказан результат прокрутки для пользователя {user_id}: {result_value}, seed: {seed}")
+        
+        return SpinPredictionResult(
+            success=True,
+            result=str(result_value),
+            seed=seed,
+            can_spin=True,
+            tickets=user.tickets,
+            message=message
+        )
+        
+    except Exception as e:
+        logging.exception(f"Ошибка при предсказании результата прокрутки: {e}")
         raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
 
 # Объединяем роутеры для экспорта

@@ -450,7 +450,7 @@ class UserRepository:
             current_user_id (int, optional): ID текущего пользователя, чтобы добавить его в список
             
         Returns:
-            list[dict]: Список лидеров с их рангом, именем и счетом
+            list[dict]: Список лидеров с их рангом, именем, ID и счетом
         """
         # Для оптимизации кэшируем базовый список лидеров без текущего пользователя
         try:
@@ -494,6 +494,7 @@ class UserRepository:
                 
                 leaders.append({
                     "rank": idx,
+                    "id": user_id,  # Добавляем ID пользователя для идентификации на клиенте
                     "name": display_name,
                     "score": spins_count
                 })
@@ -530,6 +531,7 @@ class UserRepository:
                         # Добавляем пользователя в конец списка
                         leaders.append({
                             "rank": rank,
+                            "id": current_user_id,  # Добавляем ID пользователя для идентификации на клиенте
                             "name": display_name,
                             "score": current_user.spins_count
                         })

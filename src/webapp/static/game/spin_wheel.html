@@ -16,149 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
-    <link rel="stylesheet" href="/static/game/style.css?v=202404241300">
-    <!-- Встроенные стили для нижней навигационной панели и исправления таймера -->
-    <style>
-        /* Нижняя навигационная панель - прямые стили для гарантированного применения */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 70px;
-            background-color: rgba(109, 40, 217, 0.75) !important; /* Полупрозрачный фиолетовый цвет */
-            backdrop-filter: blur(5px) !important; /* Добавляем эффект размытия */
-            -webkit-backdrop-filter: blur(5px) !important;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            z-index: 50;
-            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.2) !important;
-            border-top-left-radius: 24px;
-            border-top-right-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-bottom: none;
-            padding: 0 10px;
-        }
-        
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 10px;
-            color: #FFFFFF !important;
-            text-align: center;
-            cursor: pointer;
-            flex: 1;
-            max-width: 120px;
-        }
-        
-        .nav-text {
-            font-size: 12px;
-            font-weight: 700;
-            white-space: nowrap;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-        }
-        
-        .nav-item .material-icons-round {
-            font-size: 28px;
-            margin-bottom: 4px;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-        }
-        
-        .nav-item.active {
-            color: #FFFFFF !important;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
-        }
-        
-        .nav-item.active .material-icons-round {
-            transform: scale(1.1);
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
-        }
-
-        /* Исправления для размера и стилей таймера */
-        .wheel-info {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
-        .info-item {
-            background-color: var(--bg-color);
-            padding: 10px 15px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-            color: var(--text-light);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            font-weight: 500;
-            flex-grow: 1;
-            flex-basis: 0;
-            min-width: 0;
-        }
-        
-        /* Общие стили для всех элементов информации */
-        .info-item.tickets,
-        .info-item.nickname,
-        .info-item.timer {
-            background-color: var(--bg-color);
-            flex: 1 1 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        /* Стили для таймера - убираем специфичные размеры и унифицируем цвет */
-        .info-item.timer {
-            transition: all 0.5s ease;
-            border-radius: 10px;
-        }
-        
-        /* Скрытый таймер (когда у пользователя есть билеты) */
-        .info-item.timer.hidden-timer {
-            max-width: 0;
-            padding: 0;
-            margin: 0;
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        /* Стили для активного таймера обратного отсчета */
-        .info-item.timer.active-timer {
-            background-color: rgba(123, 31, 162, 0.2);
-            border: 1px solid rgba(123, 31, 162, 0.3);
-            animation: timerGlow 2s infinite alternate;
-            opacity: 1;
-        }
-
-        /* Адаптивные стили для мобильных устройств */
-        @media (max-width: 480px) {
-            .wheel-info {
-                flex-direction: row;
-                flex-wrap: wrap;
-                gap: 8px;
-            }
-            
-            .info-item {
-                flex: 1 1 calc(50% - 8px);
-                min-width: 0;
-            }
-            
-            /* Новое правило: элемент, переходящий на новую строку, занимает всю ширину */
-            .info-item:last-child:nth-child(2n+1) {
-                flex: 1 1 100%;
-            }
-            
-            .info-item.timer {
-                order: 3;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/game/style.css?nocache=<?= time() ?>">
     <!-- Telegram WebApp API -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Обработчик инициализации Telegram WebApp -->
@@ -239,8 +97,13 @@
                 channels.forEach(channel => {
                     channelsHtml += `
                         <div class="subscription-channel-item">
-                            <span class="material-icons-round">campaign</span>
+                            <div class="channel-icon">
+                                <span class="material-icons-round">campaign</span>
+                            </div>
                             <a href="${channel.url}" target="_blank" class="channel-link">${channel.title}</a>
+                            <div class="channel-action">
+                                <span class="material-icons-round">open_in_new</span>
+                            </div>
                         </div>
                     `;
                 });
@@ -250,13 +113,19 @@
             modal.innerHTML = `
                 <div class="modal-content subscription-content">
                     <div class="modal-header">
+                        <div class="modal-header-icon">
+                            <span class="material-icons-round">verified</span>
+                        </div>
                         <h3>Требуется подписка</h3>
                     </div>
                     <div class="modal-body">
-                        <p>Для использования приложения необходимо быть подписанным на все каналы:</p>
+                        <p class="subscription-intro">Для использования приложения необходимо быть подписанным на все каналы:</p>
                         ${channelsHtml}
                         <p class="subscription-note">После подписки нажмите кнопку проверки</p>
-                        <button id="check-subscription-btn" class="submit-button">Я подписался, проверить</button>
+                        <button id="check-subscription-btn" class="submit-button">
+                            <span class="material-icons-round">done_all</span>
+                            Я подписался, проверить
+                        </button>
                     </div>
                 </div>
             `;
@@ -269,57 +138,7 @@
             });
         }
     </script>
-    
-    <style>
-        /* Стили для модального окна подписки */
-        .subscription-modal {
-            z-index: 1000;
-        }
-        
-        .subscription-content {
-            max-width: 450px;
-        }
-        
-        .subscription-channels {
-            margin: 20px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        
-        .subscription-channel-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 15px;
-            background-color: rgba(123, 31, 162, 0.1);
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-        
-        .subscription-channel-item:hover {
-            background-color: rgba(123, 31, 162, 0.2);
-            transform: translateY(-2px);
-        }
-        
-        .channel-link {
-            color: var(--primary-dark);
-            text-decoration: none;
-            font-weight: 600;
-            flex: 1;
-        }
-        
-        .subscription-note {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin: 15px 0;
-            font-style: italic;
-        }
-        
-        #check-subscription-btn {
-            margin-top: 15px;
-        }
-    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -352,7 +171,6 @@
                             <div class="wheel" id="wheel">
                                 <!-- Сегменты колеса будут созданы скриптом -->
                             </div>
-                            <div class="wheel-center"></div>
                         </div>
                         
                         <button id="spin-button">Крутить колесо</button>
@@ -366,43 +184,20 @@
             
             <div class="tab-content" id="tab-leaders" style="display: none;">
                 <div class="container">
-                    <h1>Лидеры</h1>
-                    <div class="card-container">
-                        <div class="leaders-list">
-                            <div class="leader-item">
-                                <div class="leader-rank">1</div>
-                                <div class="leader-info">
-                                    <div class="leader-name">Александр</div>
-                                    <div class="leader-score">Баланс: 1250</div>
-                                </div>
+                    <h1>Таблица лидеров</h1>
+                    <div class="card-container leaders-card">
+                        <div class="leaders-table fade-in">
+                            <div class="leaders-header">
+                                <div class="col-rank">Место</div>
+                                <div class="col-name">Имя</div>
+                                <div class="col-score">Баллы</div>
                             </div>
-                            <div class="leader-item">
-                                <div class="leader-rank">2</div>
-                                <div class="leader-info">
-                                    <div class="leader-name">Мария</div>
-                                    <div class="leader-score">Баланс: 980</div>
-                                </div>
+                            <div class="leaders-list">
+                                <!-- Список лидеров будет заполнен динамически -->
                             </div>
-                            <div class="leader-item">
-                                <div class="leader-rank">3</div>
-                                <div class="leader-info">
-                                    <div class="leader-name">Иван</div>
-                                    <div class="leader-score">Баланс: 740</div>
-                                </div>
-                            </div>
-                            <div class="leader-item">
-                                <div class="leader-rank">4</div>
-                                <div class="leader-info">
-                                    <div class="leader-name">Анна</div>
-                                    <div class="leader-score">Баланс: 625</div>
-                                </div>
-                            </div>
-                            <div class="leader-item">
-                                <div class="leader-rank">5</div>
-                                <div class="leader-info">
-                                    <div class="leader-name">Дмитрий</div>
-                                    <div class="leader-score">Баланс: 510</div>
-                                </div>
+                            <div class="leaders-empty" style="display: none;">
+                                <span class="material-icons-round" style="font-size: 32px; color: #B39DDB; vertical-align: middle;">leaderboard</span>
+                                <span style="margin-left: 10px; color: #B39DDB; font-size: 18px;">Пока нет данных о лидерах</span>
                             </div>
                         </div>
                     </div>
@@ -412,21 +207,42 @@
             <div class="tab-content" id="tab-referral" style="display: none;">
                 <div class="container">
                     <h1>Реферальная ссылка</h1>
-                    <div class="card-container">
+                    <div class="card-container referral-card">
                         <div class="referral-info">
-                            <p class="referral-text" style="color: #4a148c; font-weight: 600; text-shadow: 0px 0.5px 0.5px rgba(0, 0, 0, 0.2);">Поделитесь своей реферальной ссылкой с друзьями и получите бесплатный билет за каждого приглашённого!</p>
-                            <div class="referral-link-container">
-                                <input type="text" id="referral-link" class="referral-link" style="color: #4a148c; font-weight: 600;" value="https://t.me/smarty_gector_ai_bot?start=ref123456" readonly>
-                                <button id="copy-link" class="copy-button">
+                            <div class="referral-header">
+                                <span class="material-icons-round">campaign</span>
+                                <h2>Приглашай друзей и получай бонусы!</h2>
+                            </div>
+                            <p class="referral-description">За каждого приглашённого друга вы получите дополнительные билеты для игры и бонусные баллы!</p>
+                        </div>
+                        
+                        <div class="referral-link-container">
+                            <div class="referral-link-label">Ваша уникальная ссылка:</div>
+                            <div class="referral-link-block">
+                                <input type="text" id="referral-link" class="referral-link" value="https://t.me/smarty_gector_ai_bot?start=ref123456" readonly>
+                                <button id="copy-link" class="copy-button" title="Скопировать">
                                     <span class="material-icons-round">content_copy</span>
                                 </button>
                             </div>
-                            <div class="referral-stats">
-                                <div class="stat-item">
-                                    <div class="stat-value">0</div>
-                                    <div class="stat-label" style="color: #4a148c; font-weight: 600;">Приглашено друзей</div>
+                        </div>
+                        
+                        <div class="referral-stats-container">
+                            <div class="referral-stats-card">
+                                <div class="stats-icon-wrapper">
+                                    <span class="material-icons-round referral-icon">group</span>
+                                </div>
+                                <div class="stats-content">
+                                    <div class="stats-value" id="invited-count">0</div>
+                                    <div class="stats-label">Приглашённых друзей</div>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <div class="referral-share">
+                            <button class="share-button" id="share-telegram">
+                                <span class="material-icons-round">send</span>
+                                Поделиться в Telegram
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -472,14 +288,20 @@
     
     <div class="win-message" id="win-message">
         <div class="win-content">
-            <div class="win-title">Поздравляем!</div>
-            <div>Вы выиграли</div>
+            <div class="win-title">
+                <span class="material-icons-round">emoji_events</span>
+                Поздравляем!
+            </div>
+            <div class="win-subtitle">Вы выиграли</div>
             <div class="win-amount" id="win-amount">0</div>
-            <div>на ваш баланс!</div>
-            <button class="win-button" id="ok-button">Отлично!</button>
+            <div class="win-subtitle">на ваш баланс!</div>
+            <button class="win-button" id="ok-button">
+                <span class="material-icons-round">thumb_up</span>
+                Отлично!
+            </button>
         </div>
     </div>
 
-    <script src="/static/game/script.js?v=202404241300"></script>
+    <script src="/static/game/script.js?nocache=<?= time() ?>"></script>
 </body>
 </html> 
