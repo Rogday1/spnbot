@@ -1,0 +1,34 @@
+[Unit]
+Description=Spin Bot v2.6.0
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+# Замените на своего пользователя
+User=ubuntu
+Group=ubuntu
+# Замените на путь к вашему проекту
+WorkingDirectory=/home/ubuntu/spin-bot
+ExecStart=/home/ubuntu/spin-bot/.venv/bin/python /home/ubuntu/spin-bot/main.py
+Restart=always
+RestartSec=10
+Environment=PYTHONPATH=/home/ubuntu/spin-bot
+
+# Настройка логирования
+StandardOutput=append:/var/log/spinbot.log
+StandardError=append:/var/log/spinbot.error.log
+
+# Ограничения ресурсов
+CPUQuota=80%
+MemoryLimit=1G
+
+# Тайм-аут остановки
+TimeoutStopSec=20
+
+# Настройки безопасности
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target 

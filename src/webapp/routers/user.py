@@ -46,6 +46,33 @@ class UpdateNicknameRequest(BaseModel):
 # Создаем роутер
 router = APIRouter(prefix="/api/user", tags=["user"])
 
+# API для получения информации о боте
+@router.get("/bot-info", response_model=Dict[str, Any])
+async def get_bot_info(request: Request):
+    """
+    Возвращает информацию о боте, включая его username.
+    Используется для формирования реферальных ссылок на фронтенде.
+    """
+    try:
+        # Получаем экземпляр бота из состояния приложения
+        bot = request.app.state.bot
+        
+        if not bot:
+            raise HTTPException(status_code=500, detail="Бот не инициализирован")
+            
+        # Получаем информацию о боте
+        bot_info = await bot.get_me()
+        
+        # Формируем ответ
+        return {
+            "username": bot_info.username,
+            "name": bot_info.first_name,
+            "id": bot_info.id
+        }
+    except Exception as e:
+        logging.error(f"Ошибка при получении информации о боте: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сервера: {str(e)}")
+
 # API для получения данных пользователя
 @router.get("/{user_id}", response_model=UserData)
 async def get_user(user_id: int, session: AsyncSession = Depends(get_session)):

@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Обработчик кнопки "Поделиться в Telegram"
         const shareButton = document.getElementById('share-telegram');
         if (shareButton) {
-            shareButton.addEventListener('click', () => {
+            shareButton.addEventListener('click', async () => {
                 const referralLink = DOM.referrallink ? DOM.referrallink.value : '';
                 if (referralLink) {
                     // Проверяем, что ссылка содержит префикс ref
@@ -178,7 +178,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.error('Ошибка: реферальная ссылка не содержит префикс ref');
                         // Пытаемся исправить ссылку
                         const userId = state.userId || getUserId();
-                        const botUsername = 'smarty_gector_ai_bot';
+                        
+                        // Получаем имя бота динамически
+                        const botUsername = await getBotUsername();
+                        
                         const correctedLink = `https://t.me/${botUsername}?start=ref${userId}`;
                         console.log(`Исправлена реферальная ссылка: ${correctedLink}`);
                         
@@ -1244,12 +1247,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Функция для получения имени пользователя бота
+    async function getBotUsername() {
+        try {
+            const botInfo = await makeApiRequest('/api/user/bot-info');
+            return botInfo.username;
+        } catch (error) {
+            console.error('Ошибка при получении информации о боте:', error);
+            // Используем имя по умолчанию в случае ошибки
+            return 'spin_bot';
+        }
+    }
+
     // Добавим функцию обновления реферальной информации
     async function updateReferralInfo(userId, referralCount) {
+        // Получаем информацию о боте
+        let botUsername = '';
+        try {
+            const botInfo = await makeApiRequest('/api/user/bot-info');
+            botUsername = botInfo.username;
+            console.log(`Получено имя бота с сервера: ${botUsername}`);
+        } catch (error) {
+            console.error('Ошибка при получении информации о боте:', error);
+            // Используем имя по умолчанию, если не удалось получить с сервера
+            botUsername = 'spin_bot'; // Значение по умолчанию
+            console.warn(`Используем имя бота по умолчанию: ${botUsername}`);
+        }
+        
         // Обновляем реферальную ссылку
         if (DOM.referrallink) {
-            // Обновляем ссылку с актуальным ID пользователя
-            const botUsername = 'smarty_gector_ai_bot'; // Можно получать динамически, если нужно
+            // Обновляем ссылку с актуальным ID пользователя и именем бота
             DOM.referrallink.value = `https://t.me/${botUsername}?start=ref${userId}`;
             
             // Проверяем, что ссылка сформирована правильно
