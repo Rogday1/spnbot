@@ -9,14 +9,73 @@
     <meta name="HandheldFriendly" content="True">
     <meta name="robots" content="noindex, nofollow">
     <title>Spin Bot - Колесо Фортуны</title>
+    
+    <!-- Единый блок для отключения кэширования -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
-    <link rel="stylesheet" href="/static/game/style.css?nocache=<?= time() ?>">
+    <link rel="stylesheet" href="/static/game/style.css">
+    
+    <!-- Стили для предотвращения мелькания контента -->
+    <style>
+        .app-preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #B39DDB 0%, #7E57C2 50%, #5E35B1 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .app-preloader.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .app-preloader__spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .app-container {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .app-container.loaded {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Скрываем все модальные окна по умолчанию */
+        .modal {
+            display: none;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+    </style>
+    
     <!-- Telegram WebApp API -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Обработчик инициализации Telegram WebApp -->
@@ -141,9 +200,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
 </head>
 <body>
+    <!-- Прелоадер для предотвращения мелькания контента -->
+    <div class="app-preloader">
+        <div class="app-preloader__spinner"></div>
+    </div>
+
     <div class="app-container">
         <div class="content-wrapper">
-            <div class="tab-content" id="tab-wheel" style="display: block;">
+            <div class="tab-content active" id="tab-wheel">
                 <div class="container">
                     <h1>Колесо Фортуны</h1>
                     
@@ -182,7 +246,7 @@
                 </div>
             </div>
             
-            <div class="tab-content" id="tab-leaders" style="display: none;">
+            <div class="tab-content" id="tab-leaders">
                 <div class="container">
                     <h1>Таблица лидеров</h1>
                     <div class="card-container leaders-card">
@@ -195,7 +259,7 @@
                             <div class="leaders-list">
                                 <!-- Список лидеров будет заполнен динамически -->
                             </div>
-                            <div class="leaders-empty" style="display: none;">
+                            <div class="leaders-empty">
                                 <span class="material-icons-round" style="font-size: 32px; color: #B39DDB; vertical-align: middle;">leaderboard</span>
                                 <span style="margin-left: 10px; color: #B39DDB; font-size: 18px;">Пока нет данных о лидерах</span>
                             </div>
@@ -204,7 +268,7 @@
                 </div>
             </div>
             
-            <div class="tab-content" id="tab-referral" style="display: none;">
+            <div class="tab-content" id="tab-referral">
                 <div class="container">
                     <h1>Реферальная ссылка</h1>
                     <div class="card-container referral-card">
@@ -302,6 +366,6 @@
         </div>
     </div>
 
-    <script src="/static/game/script.js?v=2.7.0_nocache_<?= date('YmdHis') ?>"></script>
+    <script src="/static/game/script.js"></script>
 </body>
 </html> 

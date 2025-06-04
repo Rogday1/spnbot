@@ -21,23 +21,94 @@ warning() {
     echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] ВНИМАНИЕ: $1${NC}"
 }
 
+# Установка uv
+install_uv() {
+    log "Установка uv (Astral)..."
+    
+    if command -v uv &> /dev/null; then
+        log "uv уже установлен."
+    else
+        log "Скачивание и установка uv..."
+        curl -sSf https://astral.sh/uv/install.sh | sh
+        
+        # Добавление uv в PATH для текущей сессии
+        export PATH="$HOME/.cargo/bin:$PATH"
+        
+        if ! command -v uv &> /dev/null; then
+            error "Не удалось установить uv. Пожалуйста, установите его вручную: https://astral.sh/uv"
+        fi
+    fi
+    
+    log "uv успешно установлен."
+}
+
+# Установка Python 3.11 с использованием uv
+install_python() {
+    log "Установка Python 3.11 с использованием uv..."
+    
+    # Проверка наличия Python 3.11
+    if command -v python3.11 &> /dev/null; then
+        log "Python 3.11 уже установлен."
+    else
+        # Установка Python 3.11 с помощью uv
+        uv pip install python==3.11
+        
+        if ! command -v python3.11 &> /dev/null; then
+            warning "Не удалось установить Python 3.11 через uv. Попытка установки через системный пакетный менеджер..."
+            
+            # Определение дистрибутива
+            if [ -f /etc/debian_version ]; then
+                # Debian/Ubuntu
+                sudo apt update
+                sudo apt install -y python3.11 python3.11-venv python3.11-dev
+            elif [ -f /etc/redhat-release ]; then
+                # CentOS/RHEL
+                sudo dnf install -y python3.11 python3.11-devel
+            else
+                error "Не удалось определить дистрибутив Linux. Пожалуйста, установите Python 3.11 вручную."
+            fi
+        fi
+    fi
+    
+    # Проверка версии Python
+    if ! command -v python3.11 &> /dev/null; then
+        error "Python 3.11 не установлен. Пожалуйста, установите его вручную."
+    fi
+    
+    log "Python 3.11 успешно установлен."
+}
+
 # Проверка наличия необходимых утилит
 check_requirements() {
     log "Проверка наличия необходимых утилит..."
     
-    for cmd in python3 git uv pip3 systemctl nginx; do
+    for cmd in git systemctl nginx; do
         if ! command -v $cmd &> /dev/null; then
             error "Команда '$cmd' не найдена. Пожалуйста, установите необходимое ПО."
         fi
     done
     
-    # Проверка версии Python
-    python_version=$(python3 --version | cut -d' ' -f2)
-    if [[ $(echo $python_version | cut -d'.' -f1,2) < "3.11" ]]; then
-        error "Требуется Python 3.11 или выше. Текущая версия: $python_version"
+    # Проверка наличия PostgreSQL
+    if ! command -v psql &> /dev/null; then
+        warning "PostgreSQL не найден. Будет выполнена попытка его установки..."
+        
+        # Определение дистрибутива
+        if [ -f /etc/debian_version ]; then
+            # Debian/Ubuntu
+            sudo apt update
+            sudo apt install -y postgresql postgresql-contrib
+        elif [ -f /etc/redhat-release ]; then
+            # CentOS/RHEL
+            sudo dnf install -y postgresql-server postgresql-contrib
+            sudo postgresql-setup --initdb
+            sudo systemctl enable postgresql
+            sudo systemctl start postgresql
+        else
+            error "Не удалось определить дистрибутив Linux. Пожалуйста, установите PostgreSQL вручную."
+        fi
     fi
     
-    log "Все необходимые утилиты установлены."
+    log "Все базовые утилиты установлены или будут установлены."
 }
 
 # Настройка переменных окружения
@@ -272,6 +343,8 @@ main() {
     log "Начало процесса деплоя Spin Bot v2.6.0..."
     
     check_requirements
+    install_uv
+    install_python
     setup_env
     install_dependencies
     setup_database

@@ -14,43 +14,6 @@ const state = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Функция для принудительного обновления кеша стилей
-    function forceStyleRefresh() {
-        const links = document.querySelectorAll('link[rel="stylesheet"]');
-        links.forEach(link => {
-            const href = link.href;
-            if (href.includes('/static/game/')) {
-                const newHref = href.split('?')[0] + '?nocache=' + new Date().getTime();
-                link.href = newHref;
-                console.log('Обновлен стиль:', newHref);
-            }
-        });
-        
-        // Проверяем, применились ли стили корректно
-        setTimeout(() => {
-            const winSubtitle = document.querySelector('.win-subtitle');
-            if (winSubtitle) {
-                const style = window.getComputedStyle(winSubtitle);
-                const color = style.getPropertyValue('color');
-                
-                // Если цвет не соответствует ожидаемому (не белый), принудительно перезагружаем страницу
-                if (color && !color.includes('255, 255, 255') && !color.includes('rgb(255, 255, 255)')) {
-                    console.log('Стили не применились корректно, перезагружаем страницу...');
-                    
-                    // Добавляем параметр для предотвращения кеширования
-                    const currentUrl = window.location.href;
-                    const newUrl = currentUrl.split('?')[0] + '?t=' + new Date().getTime();
-                    
-                    // Перезагружаем страницу с новым параметром
-                    window.location.href = newUrl;
-                }
-            }
-        }, 1000);
-    }
-    
-    // Принудительно обновляем стили при загрузке страницы
-    forceStyleRefresh();
-    
     // Кэшируем все DOM-элементы при загрузке страницы
     cacheDOM();
     
@@ -89,6 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Явно получаем кнопку закрытия модального окна
         DOM.closenicknamebtn = document.getElementById('close-nickname-modal');
+        
+        // Получаем элементы прелоадера
+        DOM.appPreloader = document.querySelector('.app-preloader');
+        DOM.appContainer = document.querySelector('.app-container');
     }
     
     // Функция инициализации приложения
@@ -105,8 +72,13 @@ document.addEventListener('DOMContentLoaded', () => {
         Promise.all([
             fetchUserData(),
             fetchLeaders()
-        ]).catch(error => {
+        ]).then(() => {
+            // После загрузки всех данных скрываем прелоадер и показываем контент
+            hidePreloader();
+        }).catch(error => {
             console.error("Ошибка при инициализации приложения:", error);
+            // Даже в случае ошибки скрываем прелоадер
+            hidePreloader();
         });
         
         // Очищаем колесо перед созданием нового
@@ -120,6 +92,27 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Запускаем таймер обновления времени до следующего бесплатного прокрута
         startTimer();
+    }
+    
+    // Функция для скрытия прелоадера и отображения контента
+    function hidePreloader() {
+        // Небольшая задержка для плавности анимации
+        setTimeout(() => {
+            if (DOM.appPreloader) {
+                DOM.appPreloader.classList.add('hidden');
+            }
+            
+            if (DOM.appContainer) {
+                DOM.appContainer.classList.add('loaded');
+            }
+            
+            // Полностью удаляем прелоадер после завершения анимации
+            setTimeout(() => {
+                if (DOM.appPreloader) {
+                    DOM.appPreloader.remove();
+                }
+            }, 300);
+        }, 500);
     }
     
     // Настройка всех обработчиков событий
@@ -136,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Показываем соответствующую вкладку
                 DOM.tabContents.forEach(tab => {
                     const isVisible = tab.id === tabId;
-                    tab.style.display = isVisible ? 'block' : 'none';
+                    tab.classList.toggle('active', isVisible);
                     
                     // Если открыта вкладка лидеров, обновляем данные
                     if (isVisible && tabId === 'tab-leaders') {
@@ -200,14 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Запасной вариант - открываем ссылку в новой вкладке
                         window.open(`https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
                     }
-                    
-                    // Анимация кнопки для обратной связи
-                    const originalText = shareButton.innerHTML;
-                    shareButton.innerHTML = '<span class="material-icons-round">check_circle</span> Отправлено!';
-                    
-                    setTimeout(() => {
-                        shareButton.innerHTML = originalText;
-                    }, 2000);
                 }
             });
         }
@@ -772,10 +757,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         // Если список пуст, показываем сообщение
-        if (leaders.length === 0) {
-            document.querySelector('.leaders-empty').style.display = 'flex';
-        } else {
-            document.querySelector('.leaders-empty').style.display = 'none';
+        const emptyMessage = document.querySelector('.leaders-empty');
+        if (emptyMessage) {
+            emptyMessage.classList.toggle('active', leaders.length === 0);
         }
     }
     
@@ -1215,11 +1199,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Дополнительно проверяем работу кнопки закрытия
             const closeBtn = document.querySelector('#nickname-modal .close-modal');
             if (closeBtn) {
-                // Удаляем все предыдущие обработчики, чтобы избежать дублирования
-                closeBtn.removeEventListener('click', hideNicknameModal);
-                // Добавляем новый обработчик
                 closeBtn.addEventListener('click', hideNicknameModal);
-                console.log('Добавлен обработчик закрытия при открытии модального окна');
             }
         }
     }
@@ -1235,7 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showNicknameError(message) {
         if (DOM.nicknameerror) {
             DOM.nicknameerror.textContent = message;
-            DOM.nicknameerror.style.display = 'block';
+            DOM.nicknameerror.classList.add('active');
         }
     }
     
@@ -1243,7 +1223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearNicknameError() {
         if (DOM.nicknameerror) {
             DOM.nicknameerror.textContent = '';
-            DOM.nicknameerror.style.display = 'none';
+            DOM.nicknameerror.classList.remove('active');
         }
     }
 
@@ -1296,7 +1276,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Получаем и отображаем список рефералов, если мы на вкладке рефералов
-        if (document.getElementById('tab-referral').style.display !== 'none') {
+        const referralTab = document.getElementById('tab-referral');
+        if (referralTab && referralTab.classList.contains('active')) {
             try {
                 // Загружаем первые 5 рефералов
                 const referralsData = await makeApiRequest(`/api/user/${userId}/referrals?limit=5`);
