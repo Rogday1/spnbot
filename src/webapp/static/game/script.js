@@ -13,6 +13,23 @@ const state = {
     isFreeTicketTimerActive: false
 };
 
+// Патчим глобальный fetch, чтобы всегда добавлять X-Telegram-Init-Data
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = function(input, init = {}) {
+        // Если это запрос к нашему API
+        let url = typeof input === 'string' ? input : (input.url || '');
+        if (url.startsWith('/api/') || url.startsWith('api/')) {
+            if (!init.headers) init.headers = {};
+            // Добавляем X-Telegram-Init-Data, если есть
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+                init.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
+            }
+        }
+        return originalFetch(input, init);
+    };
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     // Кэшируем все DOM-элементы при загрузке страницы
     cacheDOM();
@@ -62,6 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function initApp() {
         // Получаем ID пользователя из URL или хранилища
         state.userId = getUserId();
+        
+        // Проверяем, что приложение запущено в Telegram WebApp
+        if (!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData)) {
+            showError("Пожалуйста, запускайте приложение только через Telegram WebApp. Прямая загрузка не поддерживается по соображениям безопасности.");
+            if (DOM.appPreloader) DOM.appPreloader.classList.remove('hidden');
+            if (DOM.appContainer) DOM.appContainer.classList.remove('loaded');
+            return;
+        }
         
         if (!state.userId) {
             showError("Не удалось получить идентификатор пользователя");
