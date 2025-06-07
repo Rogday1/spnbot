@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await Promise.all([
                 fetchUserData(),
                 fetchLeaders(),
+                checkUserSubscription(),
                 // Если есть другие API-запросы, которые выполняются при старте, добавьте их сюда:
                 // fetchBotInfo() // Пример: если fetchBotInfo нужен для начальной загрузки
             ]);
@@ -1452,6 +1453,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             checkFreeTicketTimer();
+        }
+    }
+
+    // Функция для проверки подписки пользователя
+    async function checkUserSubscription() {
+        try {
+            const response = await makeApiRequest('/api/user/check_subscription', 'POST', {});
+            if (response.success) {
+                console.log('Подписка пользователя успешно проверена.');
+                // Здесь можно добавить логику обработки результата проверки подписки,
+                // например, если нужно обновить UI или показать сообщение.
+            } else {
+                console.warn('Проверка подписки не удалась:', response.message);
+                // Здесь можно показать ошибку или предупреждение пользователю
+            }
+        } catch (error) {
+            console.error('Ошибка при проверке подписки:', error);
+            showError('Не удалось проверить подписку. Пожалуйста, попробуйте позже.');
         }
     }
 });
