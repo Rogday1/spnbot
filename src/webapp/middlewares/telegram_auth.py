@@ -10,6 +10,8 @@ import logging
 import json
 import re
 
+logger = logging.getLogger(__name__)
+
 class TelegramAuthMiddleware(BaseHTTPMiddleware):
     """
     Middleware для проверки авторизации Telegram WebApp.
@@ -50,7 +52,10 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         # Максимальное допустимое время действия авторизации (24 часа)
         self.max_auth_age = 86400
         
-        logging.info("TelegramAuthMiddleware инициализирован")
+        logger.info("TelegramAuthMiddleware инициализирован")
+        if settings.DEBUG:
+            logger.debug(f"DEBUG: BOT_TOKEN (хеш): {hashlib.sha256(self.bot_token.encode()).hexdigest()}")
+            logger.debug(f"DEBUG: WEBAPP_PUBLIC_URL: {settings.WEBAPP_PUBLIC_URL}")
     
     async def dispatch(self, request: Request, call_next: Callable):
         """
@@ -77,6 +82,11 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Проверяем наличие инициализационных данных
             init_data = request.headers.get("X-Telegram-Init-Data")
             
+            if settings.DEBUG:
+                logger.debug(f"DEBUG: Получен запрос на путь: {path}, Метод: {request.method}")
+                logger.debug(f"DEBUG: Значение X-Telegram-Init-Data: {init_data}")
+                logger.debug(f"DEBUG: Origin: {origin}, Referer: {referer}")
+
             # Проверяем заголовки для защиты от CSRF
             origin = request.headers.get("Origin")
             referer = request.headers.get("Referer")
@@ -102,15 +112,15 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             if settings.DEBUG:
                 # В режиме отладки позволяем запросы без аутентификации для упрощения тестирования
                 if not init_data:
-                    logging.warning(f"Пропуск аутентификации в режиме разработки для: {path}")
+                    logging.warning(f"Пропуск аутентификации в режиме разработки для: {path} (Init Data отсутствует)")
                     return await call_next(request)
                 
                 # Проверяем Origin и Referer только в режиме отладки для диагностики
                 if origin and not is_valid_origin and origin != "null":
-                    logging.warning(f"Подозрительный Origin в режиме разработки: {origin}")
+                    logging.warning(f"Подозрительный Origin в режиме разработки: {origin} (не в разрешенных)")
                 
                 if referer and not is_valid_referer:
-                    logging.warning(f"Подозрительный Referer в режиме разработки: {referer}")
+                    logging.warning(f"Подозрительный Referer в режиме разработки: {referer} (не в разрешенных)")
                 
                 # Если данные есть, но они некорректны, все равно пытаемся их проверить
                 # чтобы логировать потенциальные проблемы
@@ -118,6 +128,9 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                     validation_result = self._validate_telegram_data(init_data)
                     if not validation_result['valid']:
                         logging.warning(f"Некорректные данные аутентификации в режиме разработки: {validation_result['error']}")
+                        logger.debug(f"DEBUG: Невалидные Init Data: {init_data}")
+                    else:
+                        logger.debug("DEBUG: Init Data успешно валидированы в режиме разработки.")
                 
                 # В любом случае пропускаем запрос в режиме отладки
                 return await call_next(request)
@@ -140,7 +153,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             if not init_data:
                 client_ip = request.client.host if request.client else "неизвестно"
                 user_agent = request.headers.get("User-Agent", "неизвестно")
-                logging.warning(f"Отсутствуют данные инициализации Telegram для: {path}. IP: {client_ip}, User-Agent: {user_agent}")
+                logger.warning(f"Отсутствуют данные инициализации Telegram для: {path}. IP: {client_ip}, User-Agent: {user_agent}")
                 
                 # Возвращаем ошибку с минимумом деталей для безопасности
                 raise HTTPException(
@@ -151,6 +164,8 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # 3. Валидируем данные с защитой от различных типов атак
             try:
                 validation_result = self._validate_telegram_data(init_data)
+                if settings.DEBUG:
+                    logger.debug(f"DEBUG: Результат валидации init_data: {validation_result}")
             except Exception as e:
                 # Добавляем детальное логирование для отладки
                 logging.error(f"Исключение при валидации данных Telegram: {e} для пути {path}")
@@ -163,7 +178,9 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             if not validation_result['valid']:
                 client_ip = request.client.host if request.client else "неизвестно"
                 error_msg = validation_result.get('error', 'Неизвестная ошибка')
-                logging.error(f"Ошибка валидации данных Telegram: {error_msg} для пути {path}. IP: {client_ip}")
+                logger.error(f"Ошибка валидации данных Telegram: {error_msg} для пути {path}. IP: {client_ip}")
+                if settings.DEBUG:
+                    logger.debug(f"DEBUG: Невалидные Init Data: {init_data}")
                 
                 # Возвращаем обобщенную ошибку для пользователя
                 raise HTTPException(
@@ -186,7 +203,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         # Сравниваем с ID из данных авторизации
                         if path_user_id != user_id_from_data:
                             client_ip = request.client.host if request.client else "неизвестно"
-                            logging.error(f"Несоответствие ID пользователя: {path_user_id} != {user_id_from_data} для пути {path}. IP: {client_ip}")
+                            logger.error(f"Несоответствие ID пользователя: {path_user_id} != {user_id_from_data} для пути {path}. IP: {client_ip}")
                             
                             # Возвращаем ошибку доступа без раскрытия деталей
                             raise HTTPException(
@@ -195,7 +212,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                             )
                     except ValueError:
                         # Если ID в URL не может быть преобразован в int
-                        logging.error(f"Некорректный формат ID пользователя в URL: {user_id_match.group(1)}")
+                        logger.error(f"Некорректный формат ID пользователя в URL: {user_id_match.group(1)}")
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Некорректный формат ID пользователя"
