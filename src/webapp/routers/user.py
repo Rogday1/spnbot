@@ -104,22 +104,22 @@ async def get_user(user_id: int, session: AsyncSession = Depends(get_session)):
 
 # Добавить эндпоинт для проверки подписки на каналы
 @router.post("/check_subscription", response_model=Dict[str, Any])
-async def check_subscription(request: Dict[str, Any], request_obj: Request):
+async def check_subscription(request_obj: Request):
     """
     Проверяет подписку пользователя на обязательные каналы.
     
     Args:
-        request: Данные запроса с user_id и initData
-        request_obj: Объект запроса FastAPI
+        request_obj: Объект запроса FastAPI (содержит user_id в состоянии)
     
     Returns:
         Dict[str, Any]: Результат проверки с флагом подписки и списком каналов
     """
     try:
-        # Получаем ID пользователя из запроса
-        user_id = request.get("user_id")
-        if not user_id:
+        # Получаем ID пользователя из состояния запроса
+        if not hasattr(request_obj.state, 'user_id') or not request_obj.state.user_id:
             raise HTTPException(status_code=400, detail="Не указан ID пользователя")
+        
+        user_id = request_obj.state.user_id
         
         # Получаем экземпляр бота из состояния приложения
         bot = request_obj.app.state.bot

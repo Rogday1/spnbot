@@ -133,9 +133,13 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         logger.debug(f"DEBUG: Невалидные Init Data: {init_data}")
                     else:
                         logger.debug("DEBUG: Init Data успешно валидированы в режиме разработки.")
-                
-                # В любом случае пропускаем запрос в режиме отладки
-                return await call_next(request)
+                    
+                    # Устанавливаем user_id в состоянии запроса для обработчиков
+                    if validation_result.get('user_id'):
+                        request.state.user_id = validation_result['user_id']
+                    
+                    # В любом случае пропускаем запрос в режиме отладки
+                    return await call_next(request)
             
             # В продакшн-режиме выполняем полные проверки
             
@@ -189,6 +193,10 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                     status_code=status.HTTP_401_UNAUTHORIZED, 
                     detail="Недействительные данные авторизации"
                 )
+            
+            # Устанавливаем user_id в состоянии запроса для обработчиков
+            if validation_result.get('user_id'):
+                request.state.user_id = validation_result['user_id']
             
             # 4. Проверяем, соответствует ли идентификатор пользователя в URL тому, что в initData
             user_id_from_data = validation_result.get('user_id')
