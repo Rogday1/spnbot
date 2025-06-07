@@ -6,12 +6,6 @@ import secrets
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-
 # Определяем корневую директорию проекта
 BASE_DIR = Path(__file__).parent.parent.parent
 
@@ -25,7 +19,7 @@ if env_path.exists():
         load_dotenv(dotenv_path=env_path, encoding='utf-8')
         logging.info(f"Загружены переменные окружения из файла {env_path} (UTF-8)")
     except Exception as e:
-        # Если UTF-8 не сработал, пробуем с другой кодировкой
+        # Если UTF-8 не сработало, пробуем с другой кодировкой
         logging.error(f"Ошибка при загрузке .env с UTF-8: {e}")
         try:
             load_dotenv(dotenv_path=env_path, encoding='cp1251')
@@ -34,6 +28,22 @@ if env_path.exists():
             logging.error(f"Ошибка при загрузке .env с CP1251: {e2}")
 else:
     logging.warning(f"Файл .env не найден по пути {env_path}")
+
+# Настройки логирования
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_FILE = os.getenv("LOG_FILE", "")
+
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(), # Вывод в консоль
+        logging.FileHandler(LOG_FILE) if LOG_FILE else logging.NullHandler() # Вывод в файл, если указан
+    ]
+)
+
+# Устанавливаем уровень логирования для корневого логгера
+logging.getLogger().setLevel(LOG_LEVEL)
 
 # Основные настройки
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
@@ -128,10 +138,6 @@ RATE_LIMIT_PATHS = {
     "/api/spin/": (10, 5),  # 5 запросов в 10 секунд для прокрутки колеса
     "/api/user/": (60, 30),  # 30 запросов в минуту для пользовательских данных
 }
-
-# Настройки для логирования
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_FILE = os.getenv("LOG_FILE", "")
 
 # Настройки сессий
 SESSION_COOKIE_NAME = "spinbot_session"
