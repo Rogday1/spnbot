@@ -187,7 +187,7 @@ async def update_nickname_old(
             return {"success": False, "message": "Пользователь не найден"}
         
         # Устанавливаем никнейм из веб-приложения
-        user.nickname_webapp = data.nickname
+        user.nickname = data.nickname
         await user_repo.update_user(user)
         
         # Логируем успешное обновление
@@ -228,7 +228,7 @@ async def update_nickname(
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     # Устанавливаем никнейм из веб-приложения
-    user.nickname_webapp = data.nickname
+    user.nickname = data.nickname
     await user_repo.update_user(user)
     
     # Получаем обновленные данные
