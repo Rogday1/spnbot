@@ -82,14 +82,16 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Проверяем наличие инициализационных данных
             init_data = request.headers.get("X-Telegram-Init-Data")
             
+            # Проверяем заголовки для защиты от CSRF
+            origin = request.headers.get("Origin")
+            referer = request.headers.get("Referer")
+            
             if settings.DEBUG:
                 logger.debug(f"DEBUG: Получен запрос на путь: {path}, Метод: {request.method}")
                 logger.debug(f"DEBUG: Значение X-Telegram-Init-Data: {init_data}")
                 logger.debug(f"DEBUG: Origin: {origin}, Referer: {referer}")
 
             # Проверяем заголовки для защиты от CSRF
-            origin = request.headers.get("Origin")
-            referer = request.headers.get("Referer")
             is_valid_origin = False
             is_valid_referer = False
             
