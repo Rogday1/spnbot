@@ -77,34 +77,54 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Функция инициализации приложения
     function initApp() {
-        // Получаем ID пользователя из URL или хранилища
-        state.userId = getUserId();
-        
         // Проверяем, что приложение запущено в Telegram WebApp
-        if (!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData)) {
+        if (!(window.Telegram && window.Telegram.WebApp)) {
             showError("Пожалуйста, запускайте приложение только через Telegram WebApp. Прямая загрузка не поддерживается по соображениям безопасности.");
             if (DOM.appPreloader) DOM.appPreloader.classList.remove('hidden');
             if (DOM.appContainer) DOM.appContainer.classList.remove('loaded');
             return;
         }
+
+        // Ждем, пока Telegram WebApp полностью инициализируется и initData будет доступен
+        // Используем комбинацию ready() и интервальной проверки initData для надежности
+        const waitForWebAppReady = setInterval(() => {
+            if (window.Telegram.WebApp.initData) {
+                clearInterval(waitForWebAppReady);
+                // Вызываем ready() после получения initData, чтобы WebApp был полностью инициализирован
+                window.Telegram.WebApp.ready();
+                proceedWithAppInitialization();
+            } else {
+                // Если initData еще нет, но WebApp уже почти готов, можно добавить лог для отладки
+                console.log("Telegram WebApp initData is not yet available, waiting...");
+            }
+        }, 100); // Проверяем каждые 100 мс
+    }
+
+    // Новая функция, которая будет выполнять остальную инициализацию после получения initData
+    async function proceedWithAppInitialization() {
+        state.userId = getUserId();
         
         if (!state.userId) {
             showError("Не удалось получить идентификатор пользователя");
             return;
         }
         
-        // Инициализируем приложение параллельно
-        Promise.all([
-            fetchUserData(),
-            fetchLeaders()
-        ]).then(() => {
+        // Инициализируем приложение параллельно, вызывая API после получения initData
+        try {
+            await Promise.all([
+                fetchUserData(),
+                fetchLeaders(),
+                // Если есть другие API-запросы, которые выполняются при старте, добавьте их сюда:
+                // fetchBotInfo() // Пример: если fetchBotInfo нужен для начальной загрузки
+            ]);
             // После загрузки всех данных скрываем прелоадер и показываем контент
             hidePreloader();
-        }).catch(error => {
+        } catch (error) {
             console.error("Ошибка при инициализации приложения:", error);
             // Даже в случае ошибки скрываем прелоадер
             hidePreloader();
-        });
+            showError(`Произошла ошибка при загрузке данных: ${error.message || error}. Пожалуйста, попробуйте позже.`);
+        }
         
         // Очищаем колесо перед созданием нового
         if (DOM.wheel) DOM.wheel.innerHTML = '';

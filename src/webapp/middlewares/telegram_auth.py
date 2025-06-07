@@ -46,7 +46,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             raise ValueError("BOT_TOKEN не может быть пустым для TelegramAuthMiddleware")
             
         self.secret_key = hashlib.sha256(self.bot_token.encode()).digest()
-        self.exclude_paths = exclude_paths or ["/docs", "/redoc", "/openapi.json", "/"]
+        self.exclude_paths = exclude_paths or ["/docs", "/redoc", "/openapi.json", "/", "/game"]
         self.exclude_prefixes = exclude_prefixes or ["/static/"]
         
         # Максимальное допустимое время действия авторизации (24 часа)
