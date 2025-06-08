@@ -1459,7 +1459,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Функция для проверки подписки пользователя
     async function checkUserSubscription() {
         try {
-            const response = await makeApiRequest('/api/user/check_subscription', 'POST', {});
+            const userData = window.Telegram.WebApp.initDataUnsafe;
+            
+            if (!userData || !userData.user) {
+                console.warn('Не удалось получить данные пользователя');
+                return;
+            }
+            
+            const userId = userData.user.id;
+            
+            const response = await makeApiRequest('/api/user/check_subscription', 'POST', {
+                user_id: userId,
+                initData: window.Telegram.WebApp.initData
+            });
+            
             if (response.success) {
                 console.log('Подписка пользователя успешно проверена.');
                 // Здесь можно добавить логику обработки результата проверки подписки,
