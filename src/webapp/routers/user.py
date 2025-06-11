@@ -115,11 +115,23 @@ async def check_subscription(request_obj: Request):
         Dict[str, Any]: Результат проверки с флагом подписки и списком каналов
     """
     try:
-        # Получаем ID пользователя из состояния запроса
-        if not hasattr(request_obj.state, 'user_id') or not request_obj.state.user_id:
-            raise HTTPException(status_code=400, detail="Не указан ID пользователя")
+        # Пытаемся получить ID пользователя из состояния запроса
+        user_id = None
+        if hasattr(request_obj.state, 'user_id') and request_obj.state.user_id:
+            user_id = request_obj.state.user_id
         
-        user_id = request_obj.state.user_id
+        # Если ID пользователя нет в состоянии, пытаемся получить его из тела запроса
+        if not user_id:
+            try:
+                body = await request_obj.json()
+                if 'user_id' in body and body['user_id']:
+                    user_id = body['user_id']
+            except Exception as e:
+                logging.warning(f"Не удалось получить user_id из тела запроса: {e}")
+        
+        # Если ID пользователя все еще нет, возвращаем ошибку
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Не указан ID пользователя")
         
         # Получаем экземпляр бота из состояния приложения
         bot = request_obj.app.state.bot
@@ -281,4 +293,4 @@ async def get_user_referral_stats(
     return ReferralStats(
         total_referrals=stats["total_referrals"],
         top_referrals=stats["top_referrals"]
-    ) 
+    )

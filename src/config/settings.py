@@ -118,6 +118,7 @@ if not SECRET_KEY:
 CORS_ORIGINS = [
     "https://telegram.org",
     "https://t.me",
+    "https://tgspin.ru",  # Добавляем домен tgspin.ru
 ]
 
 # Если задан WEBAPP_PUBLIC_URL, добавляем его в список разрешенных источников
@@ -193,4 +194,4 @@ if DEBUG:
     logging.info(f"WEBAPP_PORT: {WEBAPP_PORT}")
     logging.info(f"WEBAPP_PUBLIC_URL: {WEBAPP_PUBLIC_URL}")
     logging.info(f"DATABASE_URL: {DATABASE_URL}")
-    logging.info(f"CORS_ORIGINS: {CORS_ORIGINS}") 
+    logging.info(f"CORS_ORIGINS: {CORS_ORIGINS}")
