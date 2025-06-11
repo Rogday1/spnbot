@@ -86,7 +86,12 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             origin = request.headers.get("Origin")
             referer = request.headers.get("Referer")
             
+            # Заменить это условие
             if settings.DEBUG:
+                logger.debug(...)
+                
+            # На это условие
+            if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(f"DEBUG: Получен запрос на путь: {path}, Метод: {request.method}")
                 logger.debug(f"DEBUG: Значение X-Telegram-Init-Data: {init_data}")
                 logger.debug(f"DEBUG: Origin: {origin}, Referer: {referer}")
@@ -134,7 +139,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 if init_data:
                     validation_result = self._validate_telegram_data(init_data)
                     if not validation_result['valid']:
-                        logging.warning(f"Некорректные данные аутентификации в режиме разработки: {validation_result['error']}")
+                        logging.warning(f"Некорректные данные авторификации в режиме разработки: {validation_result['error']}")
                         logger.debug(f"DEBUG: Невалидные Init Data: {init_data}")
                     else:
                         logger.debug("DEBUG: Init Data успешно валидированы в режиме разработки.")
