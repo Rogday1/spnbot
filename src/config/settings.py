@@ -17,19 +17,19 @@ if env_path.exists():
     try:
         # Загрузка переменных окружения из .env файла с поддержкой UTF-8
         load_dotenv(dotenv_path=env_path, encoding='utf-8')
-        logging.info(f"Загружены переменные окружения из файла {env_path} (UTF-8)")
+        print(f"Загружены переменные окружения из файла {env_path} (UTF-8)")
     except Exception as e:
         # Если UTF-8 не сработало, пробуем с другой кодировкой
-        logging.error(f"Ошибка при загрузке .env с UTF-8: {e}")
+        print(f"Ошибка при загрузке .env с UTF-8: {e}")
         try:
             load_dotenv(dotenv_path=env_path, encoding='cp1251')
-            logging.info(f"Загружены переменные окружения из файла {env_path} (CP1251)")
+            print(f"Загружены переменные окружения из файла {env_path} (CP1251)")
         except Exception as e2:
-            logging.error(f"Ошибка при загрузке .env с CP1251: {e2}")
+            print(f"Ошибка при загрузке .env с CP1251: {e2}")
 else:
-    logging.warning(f"Файл .env не найден по пути {env_path}")
+    print(f"Файл .env не найден по пути {env_path}")
 
-# Настройки логирования
+# Настройки логирования - ПЕРЕМЕЩЕНО ПОСЛЕ загрузки переменных окружения
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_FILE = os.getenv("LOG_FILE", "")
 
