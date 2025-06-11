@@ -95,12 +95,17 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             is_valid_origin = False
             is_valid_referer = False
             
+            # В методе dispatch класса TelegramAuthMiddleware
+            
             # Список разрешенных источников для Telegram WebApp
-            allowed_origins = ["https://telegram.org", "https://t.me"]
+            allowed_origins = ["https://telegram.org", "https://t.me", "https://tgspin.ru"]
             
             # Если заданы CORS_ORIGINS в настройках, используем их
             if hasattr(settings, "CORS_ORIGINS") and settings.CORS_ORIGINS:
                 allowed_origins.extend(settings.CORS_ORIGINS)
+            
+            # Удаляем дубликаты
+            allowed_origins = list(set(allowed_origins))
             
             # Проверяем Origin
             if origin:
@@ -271,7 +276,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         
         return False
     
-    def _validate_telegram_data(self, init_data: str) -> Dict:
+    def _validate_telegram_data(self, init_data: str) -> Dict[str, Any]:
         """
         Валидирует данные инициализации Telegram WebApp.
         
@@ -284,18 +289,24 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         try:
             # В режиме DEBUG всегда возвращаем успешную валидацию
             if settings.DEBUG:
-                # Пытаемся извлечь ID пользователя для логов
+                # Пытаемся извлечь user_id для логов
                 try:
                     parsed_data = parse_qs(init_data)
+                    # Извлекаем user_id для использования в запросах
                     user_id = None
-                    if 'user' in parsed_data:
-                        user_data_str = parsed_data['user'][0] if parsed_data['user'] else None
-                        if user_data_str:
-                            try:
-                                user_data = json.loads(user_data_str)
-                                user_id = user_data.get('id')
-                            except json.JSONDecodeError:
-                                logging.warning(f"DEBUG: Невозможно распарсить JSON в user_data_str: {user_data_str[:100]}")
+                    try:
+                        # Пытаемся извлечь user_id из данных
+                        if parsed_data and 'user' in parsed_data and parsed_data['user']:
+                            user_data = parsed_data['user']
+                            if isinstance(user_data, dict) and 'id' in user_data:
+                                user_id = user_data['id']
+                    except Exception as e:
+                        logger.warning(f"Не удалось извлечь user_id из данных: {e}")
+                    
+                    # В режиме отладки всегда возвращаем valid=True для упрощения тестирования
+                    if settings.DEBUG:
+                        # Но все равно возвращаем user_id, если он был извлечен
+                        return {'valid': True, 'user_id': user_id}
                     
                     # Просто логируем, но не блокируем запрос в режиме отладки
                     if 'hash' not in parsed_data:
@@ -431,4 +442,4 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             # Защищаем от непредвиденных ошибок
             logging.exception(f"Непредвиденная ошибка при валидации данных Telegram: {e}")
-            return {'valid': False, 'error': 'Внутренняя ошибка валидации', 'user_id': None} 
+            return {'valid': False, 'error': 'Внутренняя ошибка валидации', 'user_id': None}

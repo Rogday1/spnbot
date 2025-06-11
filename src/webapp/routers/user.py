@@ -126,6 +126,8 @@ async def check_subscription(request_obj: Request):
                 body = await request_obj.json()
                 if 'user_id' in body and body['user_id']:
                     user_id = body['user_id']
+                    # Устанавливаем user_id в состояние запроса для дальнейшего использования
+                    request_obj.state.user_id = user_id
             except Exception as e:
                 logging.warning(f"Не удалось получить user_id из тела запроса: {e}")
         
