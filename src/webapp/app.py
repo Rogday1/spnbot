@@ -78,7 +78,7 @@ def setup_webapp(bot: Bot) -> FastAPI:
     app.add_middleware(
         TelegramAuthMiddleware,
         bot_token=settings.BOT_TOKEN,
-        exclude_paths=["/docs", "/redoc", "/openapi.json", "/"],
+        exclude_paths=["/docs", "/redoc", "/openapi.json", "/", "/game"],
         exclude_prefixes=["/static/"]
     )
     
