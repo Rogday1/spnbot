@@ -329,10 +329,6 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             if not isinstance(init_data, str):
                 return {'valid': False, 'error': 'Данные инициализации должны быть строкой', 'user_id': None}
             
-            # Проверяем на наличие недопустимых символов (защита от инъекций)
-            if re.search(r'[^\w\d\s&=\-_.,%:/@\[\]\{\}+]', init_data):
-                return {'valid': False, 'error': 'Недопустимые символы в данных инициализации', 'user_id': None}
-            
             # Проверяем максимальную длину данных для предотвращения DoS
             if len(init_data) > 10000:  # Ограничение на 10KB
                 return {'valid': False, 'error': 'Слишком большой объем данных инициализации', 'user_id': None}
@@ -375,13 +371,16 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 return {'valid': False, 'error': 'Ошибка при проверке времени авторизации', 'user_id': None}
             
-            # Формируем проверочную строку (без hash)
+            # Формируем проверочную строку из исходных параметров (до декодирования)
             try:
-                # Исключаем 'hash' и 'signature' из данных для формирования строки проверки
-                check_string = '\n'.join(
-                    f"{k}={v[0]}" for k, v in sorted(parsed_data.items())
-                    if k not in ['hash', 'signature']
-                )
+                # Разбиваем строку на параметры
+                params = init_data.split('&')
+                # Фильтруем параметры hash и signature
+                filtered_params = [p for p in params if not p.startswith('hash=') and not p.startswith('signature=')]
+                # Сортируем параметры по ключу
+                filtered_params.sort()
+                # Объединяем через символ новой строки
+                check_string = '\n'.join(filtered_params)
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
                 return {'valid': False, 'error': 'Ошибка при формировании строки для проверки подписи', 'user_id': None}
