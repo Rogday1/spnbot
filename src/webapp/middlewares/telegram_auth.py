@@ -80,20 +80,18 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             is_safe_method = request.method in ["GET", "HEAD", "OPTIONS"]
             
             # Проверяем наличие инициализационных данных
+            # Получаем и декодируем данные авторизации
             init_data = request.headers.get("X-Telegram-Init-Data")
+            if init_data:
+                init_data = unquote(init_data)
             
             # Проверяем заголовки для защиты от CSRF
             origin = request.headers.get("Origin")
             referer = request.headers.get("Referer")
             
-            # Заменить это условие
-            if settings.DEBUG:
-                logger.debug(...)
-                
-            # На это условие
+            # Логируем только путь и метод для безопасности
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(f"DEBUG: Получен запрос на путь: {path}, Метод: {request.method}")
-                logger.debug(f"DEBUG: Значение X-Telegram-Init-Data: {init_data}")
                 logger.debug(f"DEBUG: Origin: {origin}, Referer: {referer}")
 
             # Проверяем заголовки для защиты от CSRF
@@ -377,15 +375,42 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 params = init_data.split('&')
                 # Фильтруем параметры hash и signature
                 filtered_params = [p for p in params if not p.startswith('hash=') and not p.startswith('signature=')]
-                # Сортируем параметры по ключу
-                filtered_params.sort()
+                
+                # Сортируем параметры по ключу (части до '=')
+                filtered_params.sort(key=lambda p: p.split('=')[0])
+                
                 # Объединяем через символ новой строки
                 check_string = '\n'.join(filtered_params)
+                
+                # Логирование для отладки
+                if settings.DEBUG:
+                    logger.debug(f"DEBUG: Проверочная строка: {check_string}")
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
                 return {'valid': False, 'error': 'Ошибка при формировании строки для проверки подписи', 'user_id': None}
             
             # Вычисляем хеш с защитой от ошибок
+            try:
+                computed_hash = hmac.new(
+                    self.secret_key,
+                    check_string.encode(),
+                    hashlib.sha256
+                ).hexdigest()
+                
+                # Логирование для отладки
+                if settings.DEBUG:
+                    logger.debug(f"DEBUG: Вычисленный хеш: {computed_hash}")
+                    logger.debug(f"DEBUG: Полученный хеш: {received_hash}")
+            except Exception as e:
+                logging.error(f"Ошибка при вычислении хеша: {e}")
+                return {'valid': False, 'error': 'Ошибка при вычислении подписи', 'user_id': None}
+            
+            # Проверяем хеш с защитой от timing-атак
+            if not hmac.compare_digest(computed_hash, received_hash):
+                # Добавляем детальное логирование
+                if settings.DEBUG:
+                    logger.debug(f"DEBUG: Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
+                return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             try:
                 computed_hash = hmac.new(
                     self.secret_key,
