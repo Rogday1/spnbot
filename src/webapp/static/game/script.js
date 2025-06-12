@@ -551,50 +551,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
     
-    // Функция для валидации данных Telegram WebApp
-    function validateTelegramWebAppData(initData) {
-        try {
-            // Базовая проверка формата данных
-            if (!initData || typeof initData !== 'string') {
-                return { valid: false, error: "Данные инициализации отсутствуют или имеют неверный формат" };
-            }
-            
-            // Разбираем параметры из initData
-            const params = new URLSearchParams(initData);
-            
-            // В режиме разработки или тестирования пропускаем строгую проверку
-            if (window.location.hostname === 'localhost' || 
-                window.location.hostname === '127.0.0.1' || 
-                !params.get('hash')) {
-                console.log("Режим разработки: пропускаем проверку данных Telegram WebApp");
-                return { valid: true };
-            }
-            
-            // Проверяем наличие hash для предотвращения подделки
-            if (!params.get('hash')) {
-                return { valid: false, error: "Отсутствует hash в данных инициализации" };
-            }
-            
-            // Проверка auth_date (не должна быть слишком устаревшей)
-            const authDate = parseInt(params.get('auth_date') || '0');
-            const currentTime = Math.floor(Date.now() / 1000);
-            
-            // В продакшене увеличиваем допустимую разницу до 24 часов
-            const maxTimeDiff = 86400; // 24 часа
-            
-            if (currentTime - authDate > maxTimeDiff) {
-                return { valid: false, error: "Данные авторизации устарели" };
-            }
-            
-            // Если данные прошли все проверки на клиенте, 
-            // остальную проверку выполнит сервер, где есть BOT_TOKEN
-            return { valid: true };
-            
-        } catch (error) {
-            console.error("Ошибка при валидации данных Telegram WebApp:", error);
-            return { valid: false, error: "Внутренняя ошибка валидации" };
-        }
-    }
     
     // Оптимизированная функция для HTTP-запросов с кэшированием и повторными попытками
     async function makeApiRequest(endpoint, method = 'GET', body = null, retries = 2) {

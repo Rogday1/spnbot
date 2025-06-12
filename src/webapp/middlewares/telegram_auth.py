@@ -377,8 +377,10 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             
             # Формируем проверочную строку (без hash)
             try:
+                # Исключаем 'hash' и 'signature' из данных для формирования строки проверки
                 check_string = '\n'.join(
-                    f"{k}={v[0]}" for k, v in sorted(parsed_data.items()) if k != 'hash'
+                    f"{k}={v[0]}" for k, v in sorted(parsed_data.items())
+                    if k not in ['hash', 'signature']
                 )
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
