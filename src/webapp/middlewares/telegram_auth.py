@@ -82,8 +82,17 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Проверяем наличие инициализационных данных
             # Получаем и декодируем данные авторизации
             init_data = request.headers.get("X-Telegram-Init-Data")
+            logging.info(f"Получен X-Telegram-Init-Data: {init_data[:50]}..." if init_data else "X-Telegram-Init-Data отсутствует")
+            
             if init_data:
+                # Логируем данные до декодирования
+                logging.info(f"X-Telegram-Init-Data до декодирования (первые 50 символов): {init_data[:50]}...")
+                
+                # Декодируем данные
                 init_data = unquote(init_data)
+                
+                # Логируем данные после декодирования
+                logging.info(f"X-Telegram-Init-Data после декодирования (первые 50 символов): {init_data[:50]}...")
             
             # Проверяем заголовки для защиты от CSRF
             origin = request.headers.get("Origin")
@@ -373,43 +382,68 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             try:
                 # Разбиваем строку на параметры
                 params = init_data.split('&')
+                
+                # Логируем исходные данные для отладки
+                logging.info(f"Исходные данные для валидации: {init_data[:100]}...")
+                
                 # Фильтруем параметры hash и signature
                 filtered_params = [p for p in params if not p.startswith('hash=') and not p.startswith('signature=')]
+                
+                # Логируем отфильтрованные параметры
+                logging.info(f"Отфильтрованные параметры: {filtered_params[:5]}...")
                 
                 # Сортируем параметры по ключу (части до '=')
                 filtered_params.sort(key=lambda p: p.split('=')[0])
                 
+                # Логируем отсортированные параметры
+                logging.info(f"Отсортированные параметры: {filtered_params[:5]}...")
+                
                 # Объединяем через символ новой строки
                 check_string = '\n'.join(filtered_params)
                 
-                # Логирование для отладки
-                if settings.DEBUG:
-                    logger.debug(f"DEBUG: Проверочная строка: {check_string}")
+                # Логирование для отладки (всегда, не только в DEBUG режиме)
+                logging.info(f"Проверочная строка (первые 100 символов): {check_string[:100]}...")
+                logging.info(f"Длина проверочной строки: {len(check_string)}")
+                
+                # Логируем информацию о секретном ключе
+                logging.info(f"Хеш BOT_TOKEN: {hashlib.sha256(self.bot_token.encode()).hexdigest()[:10]}...")
+                logging.info(f"Длина секретного ключа: {len(self.secret_key)}")
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
                 return {'valid': False, 'error': 'Ошибка при формировании строки для проверки подписи', 'user_id': None}
             
             # Вычисляем хеш с защитой от ошибок
             try:
+                # Логируем данные для вычисления хеша
+                logging.info(f"Кодировка check_string: {check_string.encode()[:20]}...")
+                
                 computed_hash = hmac.new(
                     self.secret_key,
                     check_string.encode(),
                     hashlib.sha256
                 ).hexdigest()
                 
-                # Логирование для отладки
-                if settings.DEBUG:
-                    logger.debug(f"DEBUG: Вычисленный хеш: {computed_hash}")
-                    logger.debug(f"DEBUG: Полученный хеш: {received_hash}")
+                # Логирование для отладки (всегда, не только в DEBUG режиме)
+                logging.info(f"Вычисленный хеш: {computed_hash}")
+                logging.info(f"Полученный хеш: {received_hash}")
+                
+                # Проверяем, совпадают ли первые и последние символы хешей
+                logging.info(f"Первые 10 символов вычисленного хеша: {computed_hash[:10]}")
+                logging.info(f"Первые 10 символов полученного хеша: {received_hash[:10]}")
+                logging.info(f"Последние 10 символов вычисленного хеша: {computed_hash[-10:]}")
+                logging.info(f"Последние 10 символов полученного хеша: {received_hash[-10:]}")
+                
             except Exception as e:
                 logging.error(f"Ошибка при вычислении хеша: {e}")
                 return {'valid': False, 'error': 'Ошибка при вычислении подписи', 'user_id': None}
             
             # Проверяем хеш с защитой от timing-атак
-            if not hmac.compare_digest(computed_hash, received_hash):
+            hash_match = hmac.compare_digest(computed_hash, received_hash)
+            logging.info(f"Результат сравнения хешей: {hash_match}")
+            
+            if not hash_match:
                 # Добавляем детальное логирование
-                if settings.DEBUG:
-                    logger.debug(f"DEBUG: Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
+                logging.error(f"Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
                 return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             
             # Извлекаем и проверяем данные пользователя
