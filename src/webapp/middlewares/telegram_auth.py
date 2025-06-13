@@ -80,16 +80,19 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             is_safe_method = request.method in ["GET", "HEAD", "OPTIONS"]
             
             # Проверяем наличие инициализационных данных
-            # Получаем и декодируем данные авторизации
-            init_data = request.headers.get("X-Telegram-Init-Data")
-            logging.info(f"Получен X-Telegram-Init-Data: {init_data[:50]}..." if init_data else "X-Telegram-Init-Data отсутствует")
+            # Получаем данные авторизации
+            init_data_raw = request.headers.get("X-Telegram-Init-Data")
+            logging.info(f"Получен X-Telegram-Init-Data: {init_data_raw[:50]}..." if init_data_raw else "X-Telegram-Init-Data отсутствует")
             
-            if init_data:
-                # Логируем данные до декодирования
-                logging.info(f"X-Telegram-Init-Data до декодирования (первые 50 символов): {init_data[:50]}...")
+            if init_data_raw:
+                # Сохраняем исходные данные для валидации
+                request.state.init_data_raw = init_data_raw
                 
-                # Декодируем данные
-                init_data = unquote(init_data)
+                # Логируем данные до декодирования
+                logging.info(f"X-Telegram-Init-Data до декодирования (первые 50 символов): {init_data_raw[:50]}...")
+                
+                # Декодируем данные для использования в приложении
+                init_data = unquote(init_data_raw)
                 
                 # Логируем данные после декодирования
                 logging.info(f"X-Telegram-Init-Data после декодирования (первые 50 символов): {init_data[:50]}...")
@@ -186,7 +189,9 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             
             # 3. Валидируем данные с защитой от различных типов атак
             try:
-                validation_result = self._validate_telegram_data(init_data)
+                # Используем исходные данные (до декодирования) для валидации
+                init_data_raw = getattr(request.state, 'init_data_raw', init_data)
+                validation_result = self._validate_telegram_data(init_data, init_data_raw)
                 if settings.DEBUG:
                     logger.debug(f"DEBUG: Результат валидации init_data: {validation_result}")
             except Exception as e:
@@ -288,16 +293,20 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         
         return False
     
-    def _validate_telegram_data(self, init_data: str) -> Dict[str, Any]:
+    def _validate_telegram_data(self, init_data: str, init_data_raw: str = None) -> Dict[str, Any]:
         """
         Валидирует данные инициализации Telegram WebApp.
         
         Args:
-            init_data (str): Данные инициализации из X-Telegram-Init-Data
+            init_data (str): Декодированные данные инициализации из X-Telegram-Init-Data
+            init_data_raw (str, optional): Исходные (необработанные) данные инициализации
+                                          для формирования проверочной строки
             
         Returns:
             Dict: Результат валидации с ключами valid, error, user_id
         """
+        # Если исходные данные не переданы, используем декодированные
+        init_data_raw = init_data_raw or init_data
         try:
             # В режиме DEBUG всегда возвращаем успешную валидацию
             if settings.DEBUG:
@@ -380,30 +389,30 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             
             # Формируем проверочную строку из исходных параметров (до декодирования)
             try:
-                # Разбиваем строку на параметры
-                params = init_data.split('&')
+                # Разбиваем строку на параметры - используем исходные данные (init_data_raw)
+                params = init_data_raw.split('&')
                 
                 # Логируем исходные данные для отладки
-                logging.info(f"Исходные данные для валидации: {init_data[:100]}...")
+                logging.info(f"Исходные данные для валидации (raw): {init_data_raw[:100]}...")
                 
                 # Фильтруем параметры hash и signature
                 filtered_params = [p for p in params if not p.startswith('hash=') and not p.startswith('signature=')]
                 
                 # Логируем отфильтрованные параметры
-                logging.info(f"Отфильтрованные параметры: {filtered_params[:5]}...")
+                logging.info(f"Отфильтрованные параметры (raw): {filtered_params[:5]}...")
                 
                 # Сортируем параметры по ключу (части до '=')
                 filtered_params.sort(key=lambda p: p.split('=')[0])
                 
                 # Логируем отсортированные параметры
-                logging.info(f"Отсортированные параметры: {filtered_params[:5]}...")
+                logging.info(f"Отсортированные параметры (raw): {filtered_params[:5]}...")
                 
                 # Объединяем через символ новой строки
                 check_string = '\n'.join(filtered_params)
                 
                 # Логирование для отладки (всегда, не только в DEBUG режиме)
-                logging.info(f"Проверочная строка (первые 100 символов): {check_string[:100]}...")
-                logging.info(f"Длина проверочной строки: {len(check_string)}")
+                logging.info(f"Проверочная строка (raw, первые 100 символов): {check_string[:100]}...")
+                logging.info(f"Длина проверочной строки (raw): {len(check_string)}")
                 
                 # Логируем информацию о секретном ключе
                 logging.info(f"Хеш BOT_TOKEN: {hashlib.sha256(self.bot_token.encode()).hexdigest()[:10]}...")
