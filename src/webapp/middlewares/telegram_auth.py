@@ -383,40 +383,39 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                     return {'valid': False, 'error': 'Дата авторизации в будущем', 'user_id': None}
                 
                 if current_time - auth_time > self.max_auth_age:
+                    logging.error(f"Данные авторизации устарели: auth_time={auth_time}, current_time={current_time}, разница={current_time - auth_time} секунд")
                     return {'valid': False, 'error': 'Данные авторизации устарели', 'user_id': None}
             except ValueError:
+                logging.error(f"Ошибка при проверке времени авторизации: auth_date={auth_date}")
                 return {'valid': False, 'error': 'Ошибка при проверке времени авторизации', 'user_id': None}
             
-            # Формируем проверочную строку из исходных параметров (до декодирования)
+            # Формируем проверочную строку строго по документации Telegram
+            # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Разбиваем строку на параметры - используем исходные данные (init_data_raw)
-                params = init_data_raw.split('&')
+                # Создаем список для параметров (без hash)
+                data_check_list = []
                 
-                # Логируем исходные данные для отладки
-                logging.info(f"Исходные данные для валидации (raw): {init_data_raw[:100]}...")
+                # Разбираем строку запроса на параметры
+                for param in init_data_raw.split('&'):
+                    if '=' in param:
+                        key, value = param.split('=', 1)
+                        if key != 'hash':  # Исключаем hash из проверки
+                            data_check_list.append(f"{key}={value}")
                 
-                # Фильтруем параметры hash и signature
-                filtered_params = [p for p in params if not p.startswith('hash=') and not p.startswith('signature=')]
-                
-                # Логируем отфильтрованные параметры
-                logging.info(f"Отфильтрованные параметры (raw): {filtered_params[:5]}...")
-                
-                # Сортируем параметры по ключу (части до '=')
-                filtered_params.sort(key=lambda p: p.split('=')[0])
-                
-                # Логируем отсортированные параметры
-                logging.info(f"Отсортированные параметры (raw): {filtered_params[:5]}...")
+                # Сортируем параметры по ключу
+                data_check_list.sort()
                 
                 # Объединяем через символ новой строки
-                check_string = '\n'.join(filtered_params)
+                data_check_string = '\n'.join(data_check_list)
                 
-                # Логирование для отладки (всегда, не только в DEBUG режиме)
-                logging.info(f"Проверочная строка (raw, первые 100 символов): {check_string[:100]}...")
-                logging.info(f"Длина проверочной строки (raw): {len(check_string)}")
-                
-                # Логируем информацию о секретном ключе
+                # Логирование для отладки
+                logging.info(f"Проверочная строка (первые 100 символов): {data_check_string[:100]}...")
+                logging.info(f"Длина проверочной строки: {len(data_check_string)}")
                 logging.info(f"Хеш BOT_TOKEN: {hashlib.sha256(self.bot_token.encode()).hexdigest()[:10]}...")
                 logging.info(f"Длина секретного ключа: {len(self.secret_key)}")
+                
+                # Используем эту строку для проверки
+                check_string = data_check_string
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
                 return {'valid': False, 'error': 'Ошибка при формировании строки для проверки подписи', 'user_id': None}
