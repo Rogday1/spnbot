@@ -392,20 +392,26 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Создаем список для параметров (без hash) с сохранением оригинального представления
+                # Создаем список для параметров (без hash и signature) с сохранением оригинального представления
                 params_list = []
+                # Список параметров, которые нужно исключить (hash и любые нестандартные)
+                exclude_params = ['hash', 'signature']
+                
                 for param in init_data_raw.split('&'):
                     if not param:
                         continue
                     if '=' in param:
                         key, value = param.split('=', 1)
-                        if key == 'hash':
+                        if key in exclude_params:
                             continue
                         # Сохраняем параметр в оригинальном виде (key=value)
                         params_list.append(param)
                     else:
                         # Параметры без значения (маловероятно, но обрабатываем)
                         params_list.append(param)
+                
+                # Логируем параметры для диагностики
+                logging.info(f"Параметры для проверки: {params_list}")
                 
                 # Сортируем параметры по ключу (лексикографически)
                 params_list.sort(key=lambda p: p.split('=', 1)[0])
@@ -459,8 +465,9 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             if not hash_match:
                 # Добавляем детальное логирование
                 logging.error(f"Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
-                # Логируем проверочную строку для диагностики
+                # Логируем проверочную строку и параметры для диагностики
                 logging.info(f"Проверочная строка для диагностики: {data_check_string}")
+                logging.info(f"Полный список параметров: {init_data_raw}")
                 return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             
             # Извлекаем и проверяем данные пользователя
