@@ -392,12 +392,15 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Создаем список для параметров (без hash и signature) с сохранением оригинального представления
+                # Декодируем данные для корректного разбора (одноуровневое декодирование)
+                decoded_data = unquote(init_data_raw)
+                
+                # Создаем список для параметров (без hash и signature)
                 params_list = []
-                # Список параметров, которые нужно исключить (hash и любые нестандартные)
                 exclude_params = ['hash', 'signature']
                 
-                for param in init_data_raw.split('&'):
+                # Разбиваем на параметры по стандартному разделителю '&'
+                for param in decoded_data.split('&'):
                     if not param:
                         continue
                     if '=' in param:
@@ -405,19 +408,21 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         if key in exclude_params:
                             continue
                         # Сохраняем параметр в оригинальном виде (key=value)
-                        params_list.append(param)
+                        params_list.append(f"{key}={value}")
                     else:
-                        # Параметры без значения (маловероятно, но обрабатываем)
                         params_list.append(param)
                 
                 # Логируем параметры для диагностики
-                logging.info(f"Параметры для проверки: {params_list}")
+                logging.info(f"Декодированные параметры для проверки: {params_list}")
                 
-                # Сортируем параметры по ключу (лексикографически)
+                # Сортируем параметры по ключу
                 params_list.sort(key=lambda p: p.split('=', 1)[0])
                 
-                # Объединяем через символ новой строки
+                # Формируем проверочную строку
                 data_check_string = '\n'.join(params_list)
+                
+                # Логируем проверочную строку
+                logging.info(f"Сформированная проверочная строка: {data_check_string}")
                 
                 # Логирование для отладки
                 logging.info(f"Проверочная строка (первые 100 символов): {data_check_string[:100]}...")
@@ -463,11 +468,11 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             logging.info(f"Результат сравнения хешей: {hash_match}")
             
             if not hash_match:
-                # Добавляем детальное логирование
+                # Детальное логирование ошибки
                 logging.error(f"Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
-                # Логируем проверочную строку и параметры для диагностики
-                logging.info(f"Проверочная строка для диагностики: {data_check_string}")
-                logging.info(f"Полный список параметров: {init_data_raw}")
+                logging.info(f"Проверочная строка: {data_check_string}")
+                logging.info(f"Исходные данные: {init_data_raw}")
+                logging.info(f"Декодированные данные: {decoded_data}")
                 return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             
             # Извлекаем и проверяем данные пользователя
