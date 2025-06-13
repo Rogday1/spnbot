@@ -577,7 +577,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Если есть данные initData из Telegram, добавляем их для валидации на сервере
             if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-                headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
+                // Кодируем данные для корректной обработки на сервере
+                const encodedData = encodeURIComponent(window.Telegram.WebApp.initData);
+                headers['X-Telegram-Init-Data'] = encodedData;
             }
             
             const options = {

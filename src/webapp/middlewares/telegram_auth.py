@@ -411,19 +411,6 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 if settings.DEBUG:
                     logger.debug(f"DEBUG: Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
                 return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
-            try:
-                computed_hash = hmac.new(
-                    self.secret_key,
-                    check_string.encode(),
-                    hashlib.sha256
-                ).hexdigest()
-            except Exception as e:
-                logging.error(f"Ошибка при вычислении хеша: {e}")
-                return {'valid': False, 'error': 'Ошибка при вычислении подписи', 'user_id': None}
-            
-            # Проверяем хеш с защитой от timing-атак
-            if not hmac.compare_digest(computed_hash, received_hash):
-                return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             
             # Извлекаем и проверяем данные пользователя
             user_id = None
