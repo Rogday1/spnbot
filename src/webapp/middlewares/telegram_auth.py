@@ -392,15 +392,12 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Декодируем данные для корректного разбора (одноуровневое декодирование)
-                decoded_data = unquote(init_data_raw)
-                
-                # Создаем список для параметров (без hash и signature)
+                # Создаем список для параметров (без hash и signature) из оригинальных данных
                 params_list = []
                 exclude_params = ['hash', 'signature']
                 
-                # Разбиваем на параметры по стандартному разделителю '&'
-                for param in decoded_data.split('&'):
+                # Разбиваем оригинальные данные на параметры
+                for param in init_data_raw.split('&'):
                     if not param:
                         continue
                     if '=' in param:
@@ -408,20 +405,18 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         if key in exclude_params:
                             continue
                         # Сохраняем параметр в оригинальном виде (key=value)
-                        params_list.append(f"{key}={value}")
+                        params_list.append(param)
                     else:
                         params_list.append(param)
                 
-                # Логируем параметры для диагностики
-                logging.info(f"Декодированные параметры для проверки: {params_list}")
-                
-                # Сортируем параметры по ключу
+                # Сортируем параметры по ключу (лексикографически)
                 params_list.sort(key=lambda p: p.split('=', 1)[0])
                 
-                # Формируем проверочную строку
+                # Объединяем через символ новой строки
                 data_check_string = '\n'.join(params_list)
                 
-                # Логируем проверочную строку
+                # Логируем параметры и проверочную строку для диагностики
+                logging.info(f"Параметры для проверки: {params_list}")
                 logging.info(f"Сформированная проверочная строка: {data_check_string}")
                 
                 # Логирование для отладки
