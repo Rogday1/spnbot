@@ -396,22 +396,21 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 params_list = []
                 exclude_params = ['hash', 'signature']
                 
-                # Разбиваем декодированные данные на параметры
-                decoded_data = unquote(init_data_raw)
-                for param in decoded_data.split('&'):
+                # Разбиваем оригинальные данные на параметры
+                for param in init_data_raw.split('&'):
                     if not param:
                         continue
                     if '=' in param:
                         key, value = param.split('=', 1)
                         if key in exclude_params:
                             continue
-                        # Сохраняем параметр в декодированном виде (key=value)
-                        params_list.append(f"{key}={value}")
+                        # Сохраняем параметр в оригинальном виде (key=value)
+                        params_list.append(param)
                     else:
                         params_list.append(param)
                 
                 # Сортируем параметры по ключу (лексикографически)
-                params_list.sort()
+                params_list.sort(key=lambda p: p.split('=', 1)[0])
                 
                 # Логируем отсортированные параметры для проверки
                 logging.info(f"Отсортированные параметры: {params_list}")
