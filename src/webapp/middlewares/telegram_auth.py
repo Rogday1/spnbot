@@ -467,7 +467,8 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 logging.error(f"Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
                 logging.info(f"Проверочная строка: {data_check_string}")
                 logging.info(f"Исходные данные: {init_data_raw}")
-                logging.info(f"Декодированные данные: {decoded_data}")
+                if 'decoded_data' in locals():
+                    logging.info(f"Декодированные данные: {decoded_data}")
                 return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             
             # Извлекаем и проверяем данные пользователя
@@ -518,4 +519,10 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             # Защищаем от непредвиденных ошибок
             logging.exception(f"Непредвиденная ошибка при валидации данных Telegram: {e}")
-            return {'valid': False, 'error': 'Внутренняя ошибка валидации', 'user_id': None}
+            # Возвращаем диагностическую информацию
+            return {
+                'valid': False,
+                'error': 'Внутренняя ошибка валидации',
+                'user_id': None,
+                'details': f"Ошибка: {str(e)}"
+            }
