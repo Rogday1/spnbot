@@ -435,10 +435,11 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             try:
                 # Логируем данные для вычисления хеша
                 logging.info(f"Кодировка check_string: {check_string.encode()[:20]}...")
+                logging.info(f"Секретный ключ: {self.secret_key.hex()[:20]}...")
                 
                 computed_hash = hmac.new(
                     self.secret_key,
-                    check_string.encode(),
+                    check_string.encode('utf-8'),
                     hashlib.sha256
                 ).hexdigest()
                 
