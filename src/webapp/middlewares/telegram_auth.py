@@ -405,16 +405,20 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         if key in exclude_params:
                             continue
                         # Сохраняем параметр в оригинальном виде (key=value)
-                        params_list.append(param)
+                        params_list.append(f"{key}={value}")
                     else:
                         params_list.append(param)
                 
                 # Сортируем параметры по ключу (лексикографически)
-                params_list.sort()
+                params_list.sort(key=lambda p: p.split('=', 1)[0])
                 
-                # Объединяем через символ новой строки (без дополнительного кодирования)
+                # Логируем отсортированные параметры для проверки
+                logging.info(f"Отсортированные параметры: {params_list}")
+                
+                # Объединяем через символ новой строки
                 data_check_string = '\n'.join(params_list)
                 logging.info(f"Проверочная строка перед хешированием: {data_check_string}")
+                logging.info(f"Проверочная строка в байтах: {data_check_string.encode('utf-8')}")
                 
                 # Логируем параметры и проверочную строку для диагностики
                 logging.info(f"Параметры для проверки: {params_list}")
