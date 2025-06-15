@@ -75,12 +75,7 @@ def setup_webapp(bot: Bot) -> FastAPI:
     )
     
     # 5. Проверка аутентификации Telegram WebApp
-    app.add_middleware(
-        TelegramAuthMiddleware,
-        bot_token=settings.BOT_TOKEN,
-        exclude_paths=["/docs", "/redoc", "/openapi.json", "/", "/game", "/api/user/check_subscription", "/favicon.ico"],
-        exclude_prefixes=["/static/"]
-    )
+    app.add_middleware(TelegramAuthMiddleware)
     
     # 6. Проверка подписки на обязательные каналы
     app.add_middleware(
