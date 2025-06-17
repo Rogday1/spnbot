@@ -309,34 +309,27 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         init_data_raw = init_data_raw or init_data
         try:
             # В режиме DEBUG всегда возвращаем успешную валидацию
+            # В режиме DEBUG всегда возвращаем успешную валидацию
             if settings.DEBUG:
                 # Пытаемся извлечь user_id для логов
                 try:
                     parsed_data = parse_qs(init_data)
                     # Извлекаем user_id для использования в запросах
                     user_id = None
-                    try:
-                        # Пытаемся извлечь user_id из данных
-                        if parsed_data and 'user' in parsed_data and parsed_data['user']:
-                            user_data = parsed_data['user']
-                            if isinstance(user_data, dict) and 'id' in user_data:
-                                user_id = user_data['id']
-                    except Exception as e:
-                        logger.warning(f"Не удалось извлечь user_id из данных: {e}")
+                    if parsed_data and 'user' in parsed_data and parsed_data['user']:
+                        try:
+                            user_data = json.loads(parsed_data['user'][0])
+                            user_id = user_data.get('id')
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"DEBUG: Ошибка декодирования JSON user_data: {e}")
+                        except Exception as e:
+                            logger.warning(f"DEBUG: Не удалось извлечь user_id из данных: {e}")
                     
                     # В режиме отладки всегда возвращаем valid=True для упрощения тестирования
-                    if settings.DEBUG:
-                        # Но все равно возвращаем user_id, если он был извлечен
-                        return {'valid': True, 'user_id': user_id}
-                    
-                    # Просто логируем, но не блокируем запрос в режиме отладки
-                    if 'hash' not in parsed_data:
-                        logging.warning(f"DEBUG: Отсутствует хеш в данных для пользователя {user_id}")
+                    return {'valid': True, 'user_id': user_id}
                 except Exception as e:
-                    logging.warning(f"DEBUG: Ошибка при разборе данных: {e}")
-                
-                # В режиме отладки всегда считаем валидным
-                return {'valid': True, 'error': None, 'user_id': None}
+                    logging.warning(f"DEBUG: Ошибка при разборе данных в режиме отладки: {e}")
+                    return {'valid': True, 'error': None, 'user_id': None} # В режиме отладки всегда считаем валидным
             
             # Проверяем, что init_data не пустой и имеет допустимый формат
             if not init_data:
@@ -352,6 +345,9 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Разбираем данные с защитой от ошибок
             try:
                 parsed_data = parse_qs(init_data)
+                # Дополнительное логирование для отладки
+                logger.info(f"DEBUG: Полные декодированные данные: {init_data}")
+                logger.info(f"DEBUG: Разобранные параметры: {parsed_data}")
             except Exception as e:
                 return {'valid': False, 'error': f'Ошибка при разборе данных инициализации: {str(e)}', 'user_id': None}
             
@@ -392,12 +388,12 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Создаем список для параметров (без hash и signature) из оригинальных данных
+                # Создаем список для параметров (без hash и signature) из декодированных данных
                 params_list = []
                 exclude_params = ['hash', 'signature']
                 
-                # Разбиваем оригинальные данные на параметры
-                for param in init_data_raw.split('&'):
+                # Разбиваем декодированные данные на параметры
+                for param in init_data.split('&'): # ИСПОЛЬЗУЕМ init_data вместо init_data_raw
                     if not param:
                         continue
                     if '=' in param:
@@ -472,8 +468,8 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 logging.error(f"Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
                 logging.info(f"Проверочная строка: {data_check_string}")
                 logging.info(f"Исходные данные: {init_data_raw}")
-                if 'decoded_data' in locals():
-                    logging.info(f"Декодированные данные: {decoded_data}")
+                # Добавлено логирование декодированных данных
+                logging.info(f"Декодированные данные (init_data): {init_data}")
                 return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             
             # Извлекаем и проверяем данные пользователя
