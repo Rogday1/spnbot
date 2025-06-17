@@ -388,36 +388,37 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Создаем список для параметров (без hash и signature) из декодированных данных
-                params_list = []
-                exclude_params = ['hash', 'signature']
+                # Используем parse_qs для получения словаря декодированных параметров
+                # parse_qs возвращает список значений для каждого ключа, берем первое
+                # Исключаем 'hash' и 'signature'
                 
-                # Разбиваем декодированные данные на параметры
-                for param in init_data.split('&'): # ИСПОЛЬЗУЕМ init_data вместо init_data_raw
-                    if not param:
-                        continue
-                    if '=' in param:
-                        key, value = param.split('=', 1)
-                        if key in exclude_params:
-                            continue
-                        # Сохраняем параметр в оригинальном виде (key=value)
-                        params_list.append(param)
-                    else:
-                        params_list.append(param)
+                # Создаем список пар ключ=значение для сортировки
+                data_to_check = {}
+                for key, value_list in parsed_data.items():
+                    if key not in ['hash', 'signature']:
+                        # Значения уже декодированы parse_qs, но для 'user' это может быть JSON-строка
+                        # которую нужно обработать отдельно, чтобы избежать двойного кодирования/декодирования
+                        if key == 'user':
+                            try:
+                                # Декодируем JSON, затем снова сериализуем, чтобы убедиться в правильном формате
+                                user_obj = json.loads(value_list[0])
+                                data_to_check[key] = json.dumps(user_obj, ensure_ascii=False, separators=(',', ':'))
+                            except json.JSONDecodeError:
+                                # Если это не валидный JSON, оставляем как есть (возможно, это не user-объект)
+                                data_to_check[key] = value_list[0]
+                        else:
+                            data_to_check[key] = value_list[0]
                 
                 # Сортируем параметры по ключу (лексикографически)
-                params_list.sort(key=lambda p: p.split('=', 1)[0])
+                sorted_params = sorted(data_to_check.items())
+                
+                # Формируем проверочную строку
+                params_list = [f"{key}={value}" for key, value in sorted_params]
+                data_check_string = '\n'.join(params_list)
                 
                 # Логируем отсортированные параметры для проверки
                 logging.info(f"Отсортированные параметры: {params_list}")
-                
-                # Объединяем через символ новой строки (без дополнительного кодирования)
-                data_check_string = '\n'.join(params_list)
                 logging.info(f"Проверочная строка перед хешированием: {data_check_string}")
-                
-                # Логируем параметры и проверочную строку для диагностики
-                logging.info(f"Параметры для проверки: {params_list}")
-                logging.info(f"Сформированная проверочная строка: {data_check_string}")
                 
                 # Логирование для отладки
                 logging.info(f"Проверочная строка (первые 100 символов): {data_check_string[:100]}...")
@@ -425,7 +426,6 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 logging.info(f"Хеш BOT_TOKEN: {hashlib.sha256(self.bot_token.encode()).hexdigest()[:10]}...")
                 logging.info(f"Длина секретного ключа: {len(self.secret_key)}")
                 
-                # Используем эту строку для проверки
                 check_string = data_check_string
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
