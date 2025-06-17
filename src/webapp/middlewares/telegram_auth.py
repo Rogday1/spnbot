@@ -84,6 +84,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             init_data_raw = request.headers.get("X-Telegram-Init-Data")
             logging.info(f"Получен X-Telegram-Init-Data: {init_data_raw[:50]}..." if init_data_raw else "X-Telegram-Init-Data отсутствует")
             
+            init_data = "" # Инициализируем init_data пустой строкой
             if init_data_raw:
                 # Сохраняем исходные данные для валидации
                 request.state.init_data_raw = init_data_raw
@@ -396,18 +397,20 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 data_to_check = {}
                 for key, value_list in parsed_data.items():
                     if key not in ['hash', 'signature']:
-                        # Значения уже декодированы parse_qs, но для 'user' это может быть JSON-строка
-                        # которую нужно обработать отдельно, чтобы избежать двойного кодирования/декодирования
+                        # Декодируем каждое значение, так как parse_qs не декодирует вложенные URL-кодированные символы
+                        decoded_value = unquote(value_list[0])
+                        
                         if key == 'user':
                             try:
-                                # Декодируем JSON, затем снова сериализуем, чтобы убедиться в правильном формате
-                                user_obj = json.loads(value_list[0])
+                                # Для параметра 'user' парсим JSON, затем снова сериализуем для нормализации
+                                user_obj = json.loads(decoded_value)
+                                # ensure_ascii=False для сохранения не-ASCII символов, separators для компактности
                                 data_to_check[key] = json.dumps(user_obj, ensure_ascii=False, separators=(',', ':'))
                             except json.JSONDecodeError:
-                                # Если это не валидный JSON, оставляем как есть (возможно, это не user-объект)
-                                data_to_check[key] = value_list[0]
+                                # Если это не валидный JSON, оставляем как есть
+                                data_to_check[key] = decoded_value
                         else:
-                            data_to_check[key] = value_list[0]
+                            data_to_check[key] = decoded_value
                 
                 # Сортируем параметры по ключу (лексикографически)
                 sorted_params = sorted(data_to_check.items())
