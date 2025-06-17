@@ -1,119 +1,533 @@
 import hmac
 import hashlib
 import time
-import json
-from urllib.parse import parse_qs
-from fastapi import Request, HTTPException
+from typing import Optional, Dict, List, Callable, Any
+from urllib.parse import parse_qs, unquote
+from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 from src.config import settings
+import logging
+import json
+import re
+
+logger = logging.getLogger(__name__)
 
 class TelegramAuthMiddleware(BaseHTTPMiddleware):
     """
     Middleware для проверки авторизации Telegram WebApp.
-    Реализует безопасную проверку данных в соответствии с документацией Telegram.
+    
+    Проверяет X-Telegram-Init-Data заголовок запроса и валидирует его подпись
+    с использованием секретного токена бота.
+    Обеспечивает дополнительную защиту от CSRF и других атак.
     """
     
-    def __init__(self, app):
-        super().__init__(app)
-        self.secret_key = hashlib.sha256(settings.BOT_TOKEN.encode()).digest()
-        self.excluded_paths = [
-            '/docs', '/redoc', '/openapi.json',
-            '/', '/game', '/api/user/check_subscription',
-            '/favicon.ico'
-        ]
-        self.excluded_prefixes = ['/static/']
-        
-    async def dispatch(self, request: Request, call_next):
-        # Пропускаем проверку для исключенных путей и префиксов
-        if (any(request.url.path == path for path in self.excluded_paths) or
-            any(request.url.path.startswith(prefix) for prefix in self.excluded_prefixes)):
-            return await call_next(request)
-            
-        # В режиме DEBUG пропускаем проверку
-        if settings.DEBUG:
-            request.state.user_id = 1  # Тестовый ID для разработки
-            return await call_next(request)
-            
-        # Получаем данные авторизации
-        init_data = request.headers.get("X-Telegram-Init-Data")
-        if not init_data:
-            raise HTTPException(
-                status_code=HTTP_401_UNAUTHORIZED,
-                detail="Отсутствуют данные авторизации Telegram"
-            )
-            
-        try:
-            # Валидируем данные и получаем user_id
-            user_id = self.validate_telegram_data(init_data)
-            request.state.user_id = user_id
-            return await call_next(request)
-        except ValueError as e:
-            raise HTTPException(
-                status_code=HTTP_401_UNAUTHORIZED,
-                detail=str(e)
-            )
-        except Exception:
-            raise HTTPException(
-                status_code=HTTP_403_FORBIDDEN,
-                detail="Ошибка проверки авторизации"
-            )
-            
-    def validate_telegram_data(self, init_data: str) -> int:
+    def __init__(
+        self, 
+        app, 
+        bot_token: str = None,
+        exclude_paths: List[str] = None,
+        exclude_prefixes: List[str] = None
+    ):
         """
-        Валидирует данные Telegram WebApp и возвращает user_id
+        Инициализирует middleware для проверки авторизации Telegram WebApp.
         
         Args:
-            init_data: Строка с данными авторизации
+            app: FastAPI приложение
+            bot_token (str, optional): Токен бота для проверки подписи. По умолчанию берется из настроек.
+            exclude_paths (List[str], optional): Список путей, которые не требуют аутентификации.
+            exclude_prefixes (List[str], optional): Список префиксов путей, которые не требуют аутентификации.
+        """
+        super().__init__(app)
+        self.bot_token = bot_token or settings.BOT_TOKEN
+        
+        # Генерируем секретный ключ с проверкой
+        if not self.bot_token:
+            logging.error("Критическая ошибка: BOT_TOKEN не указан для TelegramAuthMiddleware")
+            raise ValueError("BOT_TOKEN не может быть пустым для TelegramAuthMiddleware")
+            
+        self.secret_key = hashlib.sha256(self.bot_token.encode()).digest()
+        self.exclude_paths = exclude_paths or ["/docs", "/redoc", "/openapi.json", "/", "/game"]
+        self.exclude_prefixes = exclude_prefixes or ["/static/"]
+        
+        # Максимальное допустимое время действия авторизации (24 часа)
+        self.max_auth_age = 86400
+        
+        logger.info("TelegramAuthMiddleware инициализирован")
+        if settings.DEBUG:
+            logger.debug(f"DEBUG: BOT_TOKEN (хеш): {hashlib.sha256(self.bot_token.encode()).hexdigest()}")
+            logger.debug(f"DEBUG: WEBAPP_PUBLIC_URL: {settings.WEBAPP_PUBLIC_URL}")
+    
+    async def dispatch(self, request: Request, call_next: Callable):
+        """
+        Обрабатывает каждый HTTP запрос и проверяет авторизацию.
+        
+        Args:
+            request (Request): Объект запроса
+            call_next (Callable): Функция для передачи запроса дальше
             
         Returns:
-            user_id: Идентификатор пользователя
-            
-        Raises:
-            ValueError: При ошибках валидации
+            Response: Ответ от следующего обработчика или ошибка авторизации
         """
-        # Парсим данные
-        parsed = parse_qs(init_data)
+        # Сохраняем путь для логирования
+        path = request.url.path
         
-        # Проверяем обязательные поля
-        required_fields = ['auth_date', 'hash', 'user']
-        if not all(field in parsed for field in required_fields):
-            raise ValueError("Отсутствуют обязательные поля в данных авторизации")
-            
-        # Проверяем срок действия (максимум 24 часа)
-        auth_time = int(parsed['auth_date'][0])
-        if time.time() - auth_time > 86400:
-            raise ValueError("Данные авторизации устарели")
-            
-        # Извлекаем хеш для проверки
-        received_hash = parsed['hash'][0]
-        
-        # Формируем строку для проверки
-        data_check = []
-        for key in sorted(parsed.keys()):
-            if key == 'hash':
-                continue
-            # Telegram использует первый элемент массива значений
-            data_check.append(f"{key}={parsed[key][0]}")
-        data_check_string = "\n".join(data_check)
-        
-        # Вычисляем HMAC
-        computed_hash = hmac.new(
-            self.secret_key,
-            data_check_string.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        # Сравниваем хеши с защитой от timing-атак
-        if not hmac.compare_digest(computed_hash, received_hash):
-            raise ValueError("Недействительная подпись данных")
-            
-        # Извлекаем и проверяем данные пользователя
         try:
-            user_data = json.loads(parsed['user'][0])
-            user_id = user_data.get('id')
-            if not user_id or not isinstance(user_id, int):
-                raise ValueError("Некорректный ID пользователя")
-            return user_id
-        except json.JSONDecodeError:
-            raise ValueError("Ошибка формата данных пользователя")
+            # Проверяем Path до проверки auth - это более эффективно
+            if self._should_skip_auth(path):
+                return await call_next(request)
+            
+            # Проверяем, что метод запроса безопасный (для небезопасных методов нужна CSRF-защита)
+            is_safe_method = request.method in ["GET", "HEAD", "OPTIONS"]
+            
+            # Проверяем наличие инициализационных данных
+            # Получаем данные авторизации
+            init_data_raw = request.headers.get("X-Telegram-Init-Data")
+            logging.info(f"Получен X-Telegram-Init-Data: {init_data_raw[:50]}..." if init_data_raw else "X-Telegram-Init-Data отсутствует")
+            
+            if init_data_raw:
+                # Сохраняем исходные данные для валидации
+                request.state.init_data_raw = init_data_raw
+                
+                # Логируем данные до декодирования
+                logging.info(f"X-Telegram-Init-Data до декодирования (первые 50 символов): {init_data_raw[:50]}...")
+                
+                # Декодируем данные для использования в приложении
+                init_data = unquote(init_data_raw)
+                
+                # Логируем данные после декодирования
+                logging.info(f"X-Telegram-Init-Data после декодирования (первые 50 символов): {init_data[:50]}...")
+            
+            # Проверяем заголовки для защиты от CSRF
+            origin = request.headers.get("Origin")
+            referer = request.headers.get("Referer")
+            
+            # Логируем только путь и метод для безопасности
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"DEBUG: Получен запрос на путь: {path}, Метод: {request.method}")
+                logger.debug(f"DEBUG: Origin: {origin}, Referer: {referer}")
+
+            # Проверяем заголовки для защиты от CSRF
+            is_valid_origin = False
+            is_valid_referer = False
+            
+            # В методе dispatch класса TelegramAuthMiddleware
+            
+            # Список разрешенных источников для Telegram WebApp
+            allowed_origins = ["https://telegram.org", "https://t.me", "https://tgspin.ru"]
+            
+            # Если заданы CORS_ORIGINS в настройках, используем их
+            if hasattr(settings, "CORS_ORIGINS") and settings.CORS_ORIGINS:
+                allowed_origins.extend(settings.CORS_ORIGINS)
+            
+            # Удаляем дубликаты
+            allowed_origins = list(set(allowed_origins))
+            
+            # Проверяем Origin
+            if origin:
+                is_valid_origin = any(origin.startswith(allowed) for allowed in allowed_origins)
+            
+            # Проверяем Referer
+            if referer:
+                is_valid_referer = any(referer.startswith(allowed) for allowed in allowed_origins)
+            
+            # В режиме разработки проверки более лояльные
+            if settings.DEBUG:
+                # В режиме отладки позволяем запросы без аутентификации для упрощения тестирования
+                if not init_data:
+                    logging.warning(f"Пропуск аутентификации в режиме разработки для: {path} (Init Data отсутствует)")
+                    return await call_next(request)
+                
+                # Проверяем Origin и Referer только в режиме отладки для диагностики
+                if origin and not is_valid_origin and origin != "null":
+                    logging.warning(f"Подозрительный Origin в режиме разработки: {origin} (не в разрешенных)")
+                
+                if referer and not is_valid_referer:
+                    logging.warning(f"Подозрительный Referer в режиме разработки: {referer} (не в разрешенных)")
+                
+                # Если данные есть, но они некорректны, все равно пытаемся их проверить
+                # чтобы логировать потенциальные проблемы
+                if init_data:
+                    validation_result = self._validate_telegram_data(init_data)
+                    if not validation_result['valid']:
+                        logging.warning(f"Некорректные данные авторификации в режиме разработки: {validation_result['error']}")
+                        logger.debug(f"DEBUG: Невалидные Init Data: {init_data}")
+                    else:
+                        logger.debug("DEBUG: Init Data успешно валидированы в режиме разработки.")
+                    
+                    # Устанавливаем user_id в состоянии запроса для обработчиков
+                    if validation_result.get('user_id'):
+                        request.state.user_id = validation_result['user_id']
+                    
+                    # В любом случае пропускаем запрос в режиме отладки
+                    return await call_next(request)
+            
+            # В продакшн-режиме выполняем полные проверки
+            
+            # 1. Проверяем заголовки для защиты от CSRF (только для небезопасных методов)
+            if not is_safe_method:
+                # Для POST, PUT, DELETE и других изменяющих методов нужна строгая проверка CSRF
+                valid_headers = is_valid_origin or is_valid_referer
+                
+                if not valid_headers:
+                    logging.error(f"CSRF-проверка не пройдена для {request.method} запроса на {path}. Origin: {origin}, Referer: {referer}")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Защита от CSRF: недопустимый источник запроса"
+                    )
+            
+            # 2. Проверяем наличие инициализационных данных
+            if not init_data:
+                client_ip = request.client.host if request.client else "неизвестно"
+                user_agent = request.headers.get("User-Agent", "неизвестно")
+                logger.warning(f"Отсутствуют данные инициализации Telegram для: {path}. IP: {client_ip}, User-Agent: {user_agent}")
+                
+                # Возвращаем ошибку с минимумом деталей для безопасности
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Отсутствуют данные авторизации Telegram WebApp"
+                )
+            
+            # 3. Валидируем данные с защитой от различных типов атак
+            try:
+                # Используем исходные данные (до декодирования) для валидации
+                init_data_raw = getattr(request.state, 'init_data_raw', init_data)
+                validation_result = self._validate_telegram_data(init_data, init_data_raw)
+                if settings.DEBUG:
+                    logger.debug(f"DEBUG: Результат валидации init_data: {validation_result}")
+            except Exception as e:
+                # Добавляем детальное логирование для отладки
+                logging.error(f"Исключение при валидации данных Telegram: {e} для пути {path}")
+                # Возвращаем общую ошибку без деталей для безопасности
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Ошибка проверки данных авторизации"
+                )
+            
+            if not validation_result['valid']:
+                client_ip = request.client.host if request.client else "неизвестно"
+                error_msg = validation_result.get('error', 'Неизвестная ошибка')
+                logger.error(f"Ошибка валидации данных Telegram: {error_msg} для пути {path}. IP: {client_ip}")
+                if settings.DEBUG:
+                    logger.debug(f"DEBUG: Невалидные Init Data: {init_data}")
+                
+                # Возвращаем обобщенную ошибку для пользователя
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Недействительные данные авторизации"
+                )
+            
+            # Устанавливаем user_id в состоянии запроса для обработчиков
+            if validation_result.get('user_id'):
+                request.state.user_id = validation_result['user_id']
+            
+            # 4. Проверяем, соответствует ли идентификатор пользователя в URL тому, что в initData
+            user_id_from_data = validation_result.get('user_id')
+            
+            if user_id_from_data:
+                # Извлекаем ID пользователя из пути URL с помощью регулярного выражения
+                # Ищем паттерны вида /users/123, /api/user/123/profile, и т.д.
+                user_id_match = re.search(r'/(?:users?|user_id)/(\d+)(?:/|$)', path)
+                
+                if user_id_match:
+                    try:
+                        path_user_id = int(user_id_match.group(1))
+                        
+                        # Сравниваем с ID из данных авторизации
+                        if path_user_id != user_id_from_data:
+                            client_ip = request.client.host if request.client else "неизвестно"
+                            logger.error(f"Несоответствие ID пользователя: {path_user_id} != {user_id_from_data} для пути {path}. IP: {client_ip}")
+                            
+                            # Возвращаем ошибку доступа без раскрытия деталей
+                            raise HTTPException(
+                                status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Доступ запрещен"
+                            )
+                    except ValueError:
+                        # Если ID в URL не может быть преобразован в int
+                        logger.error(f"Некорректный формат ID пользователя в URL: {user_id_match.group(1)}")
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Некорректный формат ID пользователя"
+                        )
+            
+            # 5. Если всё в порядке, продолжаем обработку запроса
+            try:
+                response = await call_next(request)
+                return response
+            except Exception as e:
+                # Логируем ошибку, но не раскрываем детали клиенту
+                logging.error(f"Ошибка при обработке запроса после аутентификации: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Внутренняя ошибка сервера"
+                )
+        except HTTPException:
+            # Пробрасываем HTTPException без изменений
+            raise
+        except Exception as e:
+            # Логируем любые другие исключения и возвращаем общую ошибку
+            logging.exception(f"Необработанное исключение в TelegramAuthMiddleware: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Внутренняя ошибка сервера при проверке авторизации"
+            )
+    
+    def _should_skip_auth(self, path: str) -> bool:
+        """
+        Проверяет, следует ли пропустить аутентификацию для данного пути.
+        
+        Args:
+            path (str): Путь запроса
+            
+        Returns:
+            bool: True, если аутентификацию следует пропустить, иначе False
+        """
+        # Проверяем точные совпадения
+        if path in self.exclude_paths:
+            return True
+        
+        # Проверяем префиксы
+        for prefix in self.exclude_prefixes:
+            if path.startswith(prefix):
+                return True
+        
+        return False
+    
+    def _validate_telegram_data(self, init_data: str, init_data_raw: str = None) -> Dict[str, Any]:
+        """
+        Валидирует данные инициализации Telegram WebApp.
+        
+        Args:
+            init_data (str): Декодированные данные инициализации из X-Telegram-Init-Data
+            init_data_raw (str, optional): Исходные (необработанные) данные инициализации
+                                          для формирования проверочной строки
+            
+        Returns:
+            Dict: Результат валидации с ключами valid, error, user_id
+        """
+        # Если исходные данные не переданы, используем декодированные
+        init_data_raw = init_data_raw or init_data
+        try:
+            # В режиме DEBUG всегда возвращаем успешную валидацию
+            if settings.DEBUG:
+                # Пытаемся извлечь user_id для логов
+                try:
+                    parsed_data = parse_qs(init_data)
+                    # Извлекаем user_id для использования в запросах
+                    user_id = None
+                    try:
+                        # Пытаемся извлечь user_id из данных
+                        if parsed_data and 'user' in parsed_data and parsed_data['user']:
+                            user_data = parsed_data['user']
+                            if isinstance(user_data, dict) and 'id' in user_data:
+                                user_id = user_data['id']
+                    except Exception as e:
+                        logger.warning(f"Не удалось извлечь user_id из данных: {e}")
+                    
+                    # В режиме отладки всегда возвращаем valid=True для упрощения тестирования
+                    if settings.DEBUG:
+                        # Но все равно возвращаем user_id, если он был извлечен
+                        return {'valid': True, 'user_id': user_id}
+                    
+                    # Просто логируем, но не блокируем запрос в режиме отладки
+                    if 'hash' not in parsed_data:
+                        logging.warning(f"DEBUG: Отсутствует хеш в данных для пользователя {user_id}")
+                except Exception as e:
+                    logging.warning(f"DEBUG: Ошибка при разборе данных: {e}")
+                
+                # В режиме отладки всегда считаем валидным
+                return {'valid': True, 'error': None, 'user_id': None}
+            
+            # Проверяем, что init_data не пустой и имеет допустимый формат
+            if not init_data:
+                return {'valid': False, 'error': 'Пустые данные инициализации', 'user_id': None}
+            
+            if not isinstance(init_data, str):
+                return {'valid': False, 'error': 'Данные инициализации должны быть строкой', 'user_id': None}
+            
+            # Проверяем максимальную длину данных для предотвращения DoS
+            if len(init_data) > 10000:  # Ограничение на 10KB
+                return {'valid': False, 'error': 'Слишком большой объем данных инициализации', 'user_id': None}
+            
+            # Разбираем данные с защитой от ошибок
+            try:
+                parsed_data = parse_qs(init_data)
+            except Exception as e:
+                return {'valid': False, 'error': f'Ошибка при разборе данных инициализации: {str(e)}', 'user_id': None}
+            
+            # Проверяем минимальный набор необходимых параметров
+            required_params = ['auth_date', 'hash', 'user']
+            for param in required_params:
+                if param not in parsed_data or not parsed_data[param]:
+                    return {'valid': False, 'error': f'Отсутствует обязательный параметр: {param}', 'user_id': None}
+            
+            # Получаем параметры для проверки
+            received_hash = parsed_data['hash'][0]
+            auth_date = parsed_data['auth_date'][0]
+            
+            # Проверяем формат хеша на соответствие
+            if not re.match(r'^[a-f0-9]{64}$', received_hash):
+                return {'valid': False, 'error': 'Некорректный формат хеша', 'user_id': None}
+            
+            # Проверяем, что auth_date - числовое значение
+            if not auth_date.isdigit():
+                return {'valid': False, 'error': 'Некорректная дата авторизации', 'user_id': None}
+            
+            # Проверяем, не устарела ли авторизация (max 24 часа)
+            try:
+                auth_time = int(auth_date)
+                current_time = int(time.time())
+                
+                if current_time < auth_time:
+                    # Дата авторизации в будущем - явно ошибка
+                    return {'valid': False, 'error': 'Дата авторизации в будущем', 'user_id': None}
+                
+                if current_time - auth_time > self.max_auth_age:
+                    logging.error(f"Данные авторизации устарели: auth_time={auth_time}, current_time={current_time}, разница={current_time - auth_time} секунд")
+                    return {'valid': False, 'error': 'Данные авторизации устарели', 'user_id': None}
+            except ValueError:
+                logging.error(f"Ошибка при проверке времени авторизации: auth_date={auth_date}")
+                return {'valid': False, 'error': 'Ошибка при проверке времени авторизации', 'user_id': None}
+            
+            # Формируем проверочную строку строго по документации Telegram
+            # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
+            try:
+                # Создаем список для параметров (без hash и signature) из оригинальных данных
+                params_list = []
+                exclude_params = ['hash', 'signature']
+                
+                # Разбиваем оригинальные данные на параметры
+                for param in init_data_raw.split('&'):
+                    if not param:
+                        continue
+                    if '=' in param:
+                        key, value = param.split('=', 1)
+                        if key in exclude_params:
+                            continue
+                        # Сохраняем параметр в оригинальном виде (key=value)
+                        params_list.append(param)
+                    else:
+                        params_list.append(param)
+                
+                # Сортируем параметры по ключу (лексикографически)
+                params_list.sort(key=lambda p: p.split('=', 1)[0])
+                
+                # Логируем отсортированные параметры для проверки
+                logging.info(f"Отсортированные параметры: {params_list}")
+                
+                # Объединяем через символ новой строки (без дополнительного кодирования)
+                data_check_string = '\n'.join(params_list)
+                logging.info(f"Проверочная строка перед хешированием: {data_check_string}")
+                
+                # Логируем параметры и проверочную строку для диагностики
+                logging.info(f"Параметры для проверки: {params_list}")
+                logging.info(f"Сформированная проверочная строка: {data_check_string}")
+                
+                # Логирование для отладки
+                logging.info(f"Проверочная строка (первые 100 символов): {data_check_string[:100]}...")
+                logging.info(f"Длина проверочной строки: {len(data_check_string)}")
+                logging.info(f"Хеш BOT_TOKEN: {hashlib.sha256(self.bot_token.encode()).hexdigest()[:10]}...")
+                logging.info(f"Длина секретного ключа: {len(self.secret_key)}")
+                
+                # Используем эту строку для проверки
+                check_string = data_check_string
+            except Exception as e:
+                logging.error(f"Ошибка при формировании проверочной строки: {e}")
+                return {'valid': False, 'error': 'Ошибка при формировании строки для проверки подписи', 'user_id': None}
+            
+            # Вычисляем хеш с защитой от ошибок
+            try:
+                # Логируем данные для вычисления хеша
+                logging.info(f"Кодировка check_string: {check_string.encode()[:20]}...")
+                logging.info(f"Секретный ключ: {self.secret_key.hex()[:20]}...")
+                
+                computed_hash = hmac.new(
+                    self.secret_key,
+                    check_string.encode('utf-8'),
+                    hashlib.sha256
+                ).hexdigest()
+                
+                # Логирование для отладки (всегда, не только в DEBUG режиме)
+                logging.info(f"Вычисленный хеш: {computed_hash}")
+                logging.info(f"Полученный хеш: {received_hash}")
+                
+                # Проверяем, совпадают ли первые и последние символы хешей
+                logging.info(f"Первые 10 символов вычисленного хеша: {computed_hash[:10]}")
+                logging.info(f"Первые 10 символов полученного хеша: {received_hash[:10]}")
+                logging.info(f"Последние 10 символов вычисленного хеша: {computed_hash[-10:]}")
+                logging.info(f"Последние 10 символов полученного хеша: {received_hash[-10:]}")
+                
+                # Дополнительно логируем проверочную строку для диагностики
+                logging.info(f"Проверочная строка (полная): {data_check_string}")
+            except Exception as e:
+                logging.error(f"Ошибка при вычислении хеша: {e}")
+                return {'valid': False, 'error': 'Ошибка при вычислении подписи', 'user_id': None}
+            
+            # Проверяем хеш с защитой от timing-атак
+            hash_match = hmac.compare_digest(computed_hash, received_hash)
+            logging.info(f"Результат сравнения хешей: {hash_match}")
+            
+            if not hash_match:
+                # Детальное логирование ошибки
+                logging.error(f"Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
+                logging.info(f"Проверочная строка: {data_check_string}")
+                logging.info(f"Исходные данные: {init_data_raw}")
+                if 'decoded_data' in locals():
+                    logging.info(f"Декодированные данные: {decoded_data}")
+                return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
+            
+            # Извлекаем и проверяем данные пользователя
+            user_id = None
+            try:
+                if 'user' in parsed_data:
+                    user_data_str = parsed_data['user'][0]
+                    if not user_data_str:
+                        return {'valid': False, 'error': 'Пустой объект пользователя', 'user_id': None}
+                    
+                    # Проверяем формат JSON
+                    if not user_data_str.startswith('{') or not user_data_str.endswith('}'):
+                        return {'valid': False, 'error': 'Некорректный формат JSON объекта пользователя', 'user_id': None}
+                    
+                    # Проверяем максимальный размер данных пользователя
+                    if len(user_data_str) > 2000:  # Ограничение 2KB
+                        return {'valid': False, 'error': 'Слишком большой объем данных пользователя', 'user_id': None}
+                    
+                    # Парсим JSON
+                    user_data = json.loads(user_data_str)
+                    
+                    # Проверяем обязательные поля пользователя
+                    user_id = user_data.get('id')
+                    
+                    # Telegram всегда предоставляет ID пользователя в WebApp
+                    if not user_id:
+                        return {'valid': False, 'error': 'Отсутствует ID пользователя', 'user_id': None}
+                    
+                    # Проверяем, что ID пользователя является числом и больше 0
+                    if not isinstance(user_id, int) or user_id <= 0:
+                        return {'valid': False, 'error': 'Некорректный ID пользователя', 'user_id': None}
+            except json.JSONDecodeError as e:
+                return {'valid': False, 'error': f'Некорректный формат данных пользователя: {e}', 'user_id': None}
+            except Exception as e:
+                logging.error(f"Ошибка при извлечении ID пользователя: {e}")
+                return {'valid': False, 'error': f'Ошибка при обработке данных пользователя: {str(e)}', 'user_id': None}
+            
+            # Дополнительные проверки данных пользователя
+            if 'query_id' in parsed_data and parsed_data['query_id'][0]:
+                # Если указан query_id, значит, запрос был через Telegram.WebApp.sendData,
+                # в таком случае нам нужно дополнительно проверить валидность формата
+                query_id = parsed_data['query_id'][0]
+                if not query_id.isalnum() or len(query_id) > 64:
+                    return {'valid': False, 'error': 'Некорректный формат query_id', 'user_id': user_id}
+            
+            return {'valid': True, 'error': None, 'user_id': user_id}
+            
+        except Exception as e:
+            # Защищаем от непредвиденных ошибок
+            logging.exception(f"Непредвиденная ошибка при валидации данных Telegram: {e}")
+            # Возвращаем диагностическую информацию
+            return {
+                'valid': False,
+                'error': 'Внутренняя ошибка валидации',
+                'user_id': None,
+                'details': f"Ошибка: {str(e)}"
+            }
