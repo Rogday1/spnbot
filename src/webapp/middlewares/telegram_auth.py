@@ -399,7 +399,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 
                 data_to_check = {}
                 for key, value_list in params_from_raw.items():
-                    if key not in ['hash', 'signature']:
+                    if key != 'hash':  # Отфильтровываем только hash, оставляем signature
                         # Используем оригинальное, дважды закодированное значение
                         # Telegram ожидает, что значения будут в том виде, в котором они были получены,
                         # за исключением верхнего уровня URL-декодирования, которое уже произошло
@@ -417,6 +417,8 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 # Логируем отсортированные параметры для проверки
                 logging.info(f"Отсортированные параметры: {params_list}")
                 logging.info(f"Проверочная строка перед хешированием: {data_check_string}")
+                logging.info(f"Проверочная строка содержит параметр signature: {'signature' in data_to_check}")
+                logging.info(f"Количество параметров в проверочной строке: {len(data_to_check)}")
                 
                 # Логирование для отладки
                 logging.info(f"Проверочная строка (первые 100 символов): {data_check_string[:100]}...")
