@@ -389,23 +389,19 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Используем parse_qs для получения словаря декодированных параметров
-                # parse_qs возвращает список значений для каждого ключа, берем первое
-                # Исключаем 'hash' и 'signature'
-                
-                # Создаем список пар ключ=значение для сортировки из init_data_raw
-                # Это позволит сохранить оригинальное кодирование внутри значений
-                params_from_raw = parse_qs(init_data_raw)
-                
+                # Разбираем строку на пары ключ=значение
+                # Используем более прямой подход, разделяя строку по &
+                parts = init_data.split('&')
                 data_to_check = {}
-                for key, value_list in params_from_raw.items():
-                    if key != 'hash':  # Отфильтровываем только hash, оставляем signature
-                        # Используем оригинальное, дважды закодированное значение
-                        # Telegram ожидает, что значения будут в том виде, в котором они были получены,
-                        # за исключением верхнего уровня URL-декодирования, которое уже произошло
-                        # при получении init_data_raw.
-                        # Здесь мы берем первое значение из списка, как оно есть.
-                        data_to_check[key] = value_list[0]
+                
+                for part in parts:
+                    if '=' in part:
+                        key, value = part.split('=', 1)
+                        if key != 'hash':  # Исключаем только hash
+                            data_to_check[key] = value
+                
+                # Дополнительное логирование для отладки
+                logging.info(f"Параметры, разобранные вручную: {data_to_check}")
                 
                 # Сортируем параметры по ключу (лексикографически)
                 sorted_params = sorted(data_to_check.items())
@@ -419,6 +415,10 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 logging.info(f"Проверочная строка перед хешированием: {data_check_string}")
                 logging.info(f"Проверочная строка содержит параметр signature: {'signature' in data_to_check}")
                 logging.info(f"Количество параметров в проверочной строке: {len(data_to_check)}")
+                
+                # Дополнительное логирование для отладки каждого параметра
+                for key, value in sorted_params:
+                    logging.info(f"Параметр в проверочной строке: {key}={value[:30]}...")
                 
                 # Логирование для отладки
                 logging.info(f"Проверочная строка (первые 100 символов): {data_check_string[:100]}...")
