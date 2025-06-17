@@ -402,10 +402,11 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         
                         if key == 'user':
                             try:
-                                # Для параметра 'user' парсим JSON, затем снова сериализуем для нормализации
+                                # Для параметра 'user' парсим JSON
                                 user_obj = json.loads(decoded_value)
-                                # ensure_ascii=False для сохранения не-ASCII символов, separators для компактности
-                                data_to_check[key] = json.dumps(user_obj, ensure_ascii=False, separators=(',', ':'))
+                                # Сериализуем обратно в JSON, но с сортировкой ключей и без экранирования ASCII
+                                # Это важно для консистентности хеша
+                                data_to_check[key] = json.dumps(user_obj, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
                             except json.JSONDecodeError:
                                 # Если это не валидный JSON, оставляем как есть
                                 data_to_check[key] = decoded_value
