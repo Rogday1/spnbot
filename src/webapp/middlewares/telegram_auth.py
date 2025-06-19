@@ -393,12 +393,23 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 # Используем более прямой подход, разделяя строку по &
                 parts = init_data.split('&')
                 data_to_check = {}
+                # Разрешенные параметры согласно документации Telegram
+                allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
                 
                 for part in parts:
                     if '=' in part:
                         key, value = part.split('=', 1)
-                        if key != 'hash':  # Исключаем только hash
-                            data_to_check[key] = value
+                        # Всегда исключаем 'hash'
+                        if key == 'hash':
+                            continue
+                        # Исключаем 'signature' - нестандартный параметр
+                        if key == 'signature':
+                            continue
+                        # Проверяем разрешенные параметры
+                        if key not in allowed_params:
+                            logger.warning(f"Обнаружен нестандартный параметр: {key}. Он будет исключен из проверочной строки.")
+                            continue
+                        data_to_check[key] = value
                 
                 # Дополнительное логирование для отладки
                 logging.info(f"Параметры, разобранные вручную: {data_to_check}")
