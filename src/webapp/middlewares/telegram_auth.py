@@ -349,7 +349,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                             logger.warning(f"DEBUG: Ошибка декодирования JSON user_data: {e}")
                         except Exception as e:
                             logger.warning(f"DEBUG: Не удалось извлечь user_id из данных: {e}")
-                    
+                
                     # В режиме отладки всегда возвращаем valid=True для упрощения тестирования
                     return {'valid': True, 'user_id': user_id}
                 except Exception as e:
@@ -413,9 +413,12 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Используем исходные данные для правильного формирования проверочной строки
-                # Разбираем исходную строку на параметры
-                parts = init_data.split('&')
+                # ВАЖНО: Используем исходные данные (init_data_raw) для правильного формирования проверочной строки
+                # Telegram отправляет данные в URL-encoded виде, и именно в таком виде их нужно проверять
+                
+                # Декодируем исходные данные только один раз для разбора параметров
+                raw_decoded = unquote(init_data_raw)
+                parts = raw_decoded.split('&')
                 data_to_check = {}
                 
                 # Разрешенные параметры согласно документации Telegram
@@ -439,17 +442,19 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             
                 # Дополнительное логирование для отладки
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
+                logging.info(f"Исходные данные (raw): {init_data_raw[:100]}...")
+                logging.info(f"Декодированные данные (для разбора): {raw_decoded[:100]}...")
             
                 # Сортируем параметры по ключу (лексикографически)
                 sorted_params = sorted(data_to_check.items())
             
                 # Формируем проверочную строку - ВАЖНО: разделяем параметры символом \n
                 params_list = [f"{key}={value}" for key, value in sorted_params]
-                data_check_string = '\n'.join(params_list)  # Используем \n вместо склеивания
+                data_check_string = '\n'.join(params_list)
             
                 # Логируем отсортированные параметры для проверки
-                logging.info(f"Отсортированные параметры: {params_list}")
-                logging.info(f"Проверочная строка (с \\n разделителями): {repr(data_check_string)}")
+                logging.info(f"Отсортированные параметры: {[f'{k}={v[:30]}...' for k, v in sorted_params]}")
+                logging.info(f"Проверочная строка (с \\n разделителями): {repr(data_check_string[:200])}...")
                 logging.info(f"Количество параметров в проверочной строке: {len(data_to_check)}")
             
                 check_string = data_check_string
