@@ -332,7 +332,6 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         init_data_raw = init_data_raw or init_data
         try:
             # В режиме DEBUG всегда возвращаем успешную валидацию
-            # В режиме DEBUG всегда возвращаем успешную валидацию
             if settings.DEBUG:
                 # Пытаемся извлечь user_id для логов
                 try:
@@ -341,8 +340,11 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                     user_id = None
                     if parsed_data and 'user' in parsed_data and parsed_data['user']:
                         try:
-                            user_data = json.loads(parsed_data['user'][0])
+                            # Декодируем URL-encoded JSON
+                            user_json = unquote(parsed_data['user'][0])
+                            user_data = json.loads(user_json)
                             user_id = user_data.get('id')
+                            logger.debug(f"DEBUG: Извлечен user_id: {user_id}")
                         except json.JSONDecodeError as e:
                             logger.warning(f"DEBUG: Ошибка декодирования JSON user_data: {e}")
                         except Exception as e:
@@ -411,10 +413,11 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # Разбираем строку на пары ключ=значение
-                # Используем более прямой подход, разделяя строку по &
+                # Используем исходные данные для правильного формирования проверочной строки
+                # Разбираем исходную строку на параметры
                 parts = init_data.split('&')
                 data_to_check = {}
+                
                 # Разрешенные параметры согласно документации Telegram
                 allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
                 
@@ -426,39 +429,29 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                             continue
                         # Исключаем 'signature' - нестандартный параметр
                         if key == 'signature':
+                            logger.info(f"Исключаем нестандартный параметр 'signature': {value[:20]}...")
                             continue
                         # Проверяем разрешенные параметры
                         if key not in allowed_params:
                             logger.warning(f"Обнаружен нестандартный параметр: {key}. Он будет исключен из проверочной строки.")
                             continue
                         data_to_check[key] = value
-                
+            
                 # Дополнительное логирование для отладки
-                logging.info(f"Параметры, разобранные вручную: {data_to_check}")
-                
+                logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
+            
                 # Сортируем параметры по ключу (лексикографически)
                 sorted_params = sorted(data_to_check.items())
-                
-                # Формируем проверочную строку
+            
+                # Формируем проверочную строку - ВАЖНО: разделяем параметры символом \n
                 params_list = [f"{key}={value}" for key, value in sorted_params]
-                data_check_string = '\n'.join(params_list)
-                
+                data_check_string = '\n'.join(params_list)  # Используем \n вместо склеивания
+            
                 # Логируем отсортированные параметры для проверки
                 logging.info(f"Отсортированные параметры: {params_list}")
-                logging.info(f"Проверочная строка перед хешированием: {data_check_string}")
-                logging.info(f"Проверочная строка содержит параметр signature: {'signature' in data_to_check}")
+                logging.info(f"Проверочная строка (с \\n разделителями): {repr(data_check_string)}")
                 logging.info(f"Количество параметров в проверочной строке: {len(data_to_check)}")
-                
-                # Дополнительное логирование для отладки каждого параметра
-                for key, value in sorted_params:
-                    logging.info(f"Параметр в проверочной строке: {key}={value[:30]}...")
-                
-                # Логирование для отладки
-                logging.info(f"Проверочная строка (первые 100 символов): {data_check_string[:100]}...")
-                logging.info(f"Длина проверочной строки: {len(data_check_string)}")
-                logging.info(f"Хеш BOT_TOKEN: {hashlib.sha256(self.bot_token.encode()).hexdigest()[:10]}...")
-                logging.info(f"Длина секретного ключа: {len(self.secret_key)}")
-                
+            
                 check_string = data_check_string
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
@@ -467,27 +460,23 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Вычисляем хеш с защитой от ошибок
             try:
                 # Логируем данные для вычисления хеша
-                logging.info(f"Кодировка check_string: {check_string.encode()[:20]}...")
-                logging.info(f"Секретный ключ: {self.secret_key.hex()[:20]}...")
-                
+                logging.info(f"Проверочная строка для хеширования: {repr(check_string[:100])}...")
+                logging.info(f"Длина проверочной строки: {len(check_string)}")
+            
                 computed_hash = hmac.new(
                     self.secret_key,
                     check_string.encode('utf-8'),
                     hashlib.sha256
                 ).hexdigest()
-                
+            
                 # Логирование для отладки (всегда, не только в DEBUG режиме)
                 logging.info(f"Вычисленный хеш: {computed_hash}")
                 logging.info(f"Полученный хеш: {received_hash}")
-                
+            
                 # Проверяем, совпадают ли первые и последние символы хешей
                 logging.info(f"Первые 10 символов вычисленного хеша: {computed_hash[:10]}")
                 logging.info(f"Первые 10 символов полученного хеша: {received_hash[:10]}")
-                logging.info(f"Последние 10 символов вычисленного хеша: {computed_hash[-10:]}")
-                logging.info(f"Последние 10 символов полученного хеша: {received_hash[-10:]}")
-                
-                # Дополнительно логируем проверочную строку для диагностики
-                logging.info(f"Проверочная строка (полная): {data_check_string}")
+            
             except Exception as e:
                 logging.error(f"Ошибка при вычислении хеша: {e}")
                 return {'valid': False, 'error': 'Ошибка при вычислении подписи', 'user_id': None}
@@ -499,10 +488,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             if not hash_match:
                 # Детальное логирование ошибки
                 logging.error(f"Несовпадение хешей: вычисленный={computed_hash}, полученный={received_hash}")
-                logging.info(f"Проверочная строка: {data_check_string}")
-                logging.info(f"Исходные данные: {init_data_raw}")
-                # Добавлено логирование декодированных данных
-                logging.info(f"Декодированные данные (init_data): {init_data}")
+                logging.info(f"Проверочная строка: {repr(check_string)}")
                 return {'valid': False, 'error': 'Недействительная подпись данных', 'user_id': None}
             
             # Извлекаем и проверяем данные пользователя
@@ -512,25 +498,28 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                     user_data_str = parsed_data['user'][0]
                     if not user_data_str:
                         return {'valid': False, 'error': 'Пустой объект пользователя', 'user_id': None}
-                    
+                
+                    # Декодируем URL-encoded JSON
+                    user_data_decoded = unquote(user_data_str)
+                
                     # Проверяем формат JSON
-                    if not user_data_str.startswith('{') or not user_data_str.endswith('}'):
+                    if not user_data_decoded.startswith('{') or not user_data_decoded.endswith('}'):
                         return {'valid': False, 'error': 'Некорректный формат JSON объекта пользователя', 'user_id': None}
-                    
+                
                     # Проверяем максимальный размер данных пользователя
-                    if len(user_data_str) > 2000:  # Ограничение 2KB
+                    if len(user_data_decoded) > 2000:  # Ограничение 2KB
                         return {'valid': False, 'error': 'Слишком большой объем данных пользователя', 'user_id': None}
-                    
+                
                     # Парсим JSON
-                    user_data = json.loads(user_data_str)
-                    
+                    user_data = json.loads(user_data_decoded)
+                
                     # Проверяем обязательные поля пользователя
                     user_id = user_data.get('id')
-                    
+                
                     # Telegram всегда предоставляет ID пользователя в WebApp
                     if not user_id:
                         return {'valid': False, 'error': 'Отсутствует ID пользователя', 'user_id': None}
-                    
+                
                     # Проверяем, что ID пользователя является числом и больше 0
                     if not isinstance(user_id, int) or user_id <= 0:
                         return {'valid': False, 'error': 'Некорректный ID пользователя', 'user_id': None}
@@ -545,7 +534,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 # Если указан query_id, значит, запрос был через Telegram.WebApp.sendData,
                 # в таком случае нам нужно дополнительно проверить валидность формата
                 query_id = parsed_data['query_id'][0]
-                if not query_id.isalnum() or len(query_id) > 64:
+                if not query_id.replace('-', '').replace('_', '').isalnum() or len(query_id) > 64:
                     return {'valid': False, 'error': 'Некорректный формат query_id', 'user_id': user_id}
             
             return {'valid': True, 'error': None, 'user_id': user_id}
