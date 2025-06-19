@@ -46,13 +46,36 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             raise ValueError("BOT_TOKEN не может быть пустым для TelegramAuthMiddleware")
             
         self.secret_key = hashlib.sha256(self.bot_token.encode()).digest()
-        self.exclude_paths = exclude_paths or ["/docs", "/redoc", "/openapi.json", "/", "/game"]
-        self.exclude_prefixes = exclude_prefixes or ["/static/"]
+        
+        # Расширенный список исключений для путей, которые не требуют аутентификации
+        self.exclude_paths = exclude_paths or [
+            "/docs", "/redoc", "/openapi.json", "/", "/game",
+            "/favicon.ico", "/robots.txt", "/sitemap.xml",
+            "/api/user/check_subscription",  # Проверка подписки
+            "/api/health",  # Проверка здоровья приложения
+            "/api/status",  # Статус приложения
+            "/webhook",  # Webhook для Telegram бота
+            "/api/webhook",  # Альтернативный путь для webhook
+        ]
+        
+        # Префиксы путей, которые не требуют аутентификации
+        self.exclude_prefixes = exclude_prefixes or [
+            "/static/", 
+            "/assets/", 
+            "/css/", 
+            "/js/", 
+            "/img/", 
+            "/images/",
+            "/api/public/",  # Публичные API эндпоинты
+        ]
         
         # Максимальное допустимое время действия авторизации (24 часа)
         self.max_auth_age = 86400
         
         logger.info("TelegramAuthMiddleware инициализирован")
+        logger.info(f"Исключенные пути: {self.exclude_paths}")
+        logger.info(f"Исключенные префиксы: {self.exclude_prefixes}")
+        
         if settings.DEBUG:
             logger.debug(f"DEBUG: BOT_TOKEN (хеш): {hashlib.sha256(self.bot_token.encode()).hexdigest()}")
             logger.debug(f"DEBUG: WEBAPP_PUBLIC_URL: {settings.WEBAPP_PUBLIC_URL}")
@@ -74,6 +97,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
         try:
             # Проверяем Path до проверки auth - это более эффективно
             if self._should_skip_auth(path):
+                logger.debug(f"Пропуск аутентификации для пути: {path}")
                 return await call_next(request)
             
             # Проверяем, что метод запроса безопасный (для небезопасных методов нужна CSRF-защита)
@@ -110,8 +134,6 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Проверяем заголовки для защиты от CSRF
             is_valid_origin = False
             is_valid_referer = False
-            
-            # В методе dispatch класса TelegramAuthMiddleware
             
             # Список разрешенных источников для Telegram WebApp
             allowed_origins = ["https://telegram.org", "https://t.me", "https://tgspin.ru"]
@@ -150,7 +172,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 if init_data:
                     validation_result = self._validate_telegram_data(init_data)
                     if not validation_result['valid']:
-                        logging.warning(f"Некорректные данные авторификации в режиме разработки: {validation_result['error']}")
+                        logging.warning(f"Некорректные данные авторизации в режиме разработки: {validation_result['error']}")
                         logger.debug(f"DEBUG: Невалидные Init Data: {init_data}")
                     else:
                         logger.debug("DEBUG: Init Data успешно валидированы в режиме разработки.")
