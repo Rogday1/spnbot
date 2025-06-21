@@ -422,17 +422,13 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 data_to_check = {}
                 
                 # Разрешенные параметры согласно документации Telegram
-                allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
+                allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param', 'signature']
                 
                 for part in parts:
                     if '=' in part:
                         key, value = part.split('=', 1)
                         # Всегда исключаем 'hash'
                         if key == 'hash':
-                            continue
-                        # Исключаем 'signature' - нестандартный параметр
-                        if key == 'signature':
-                            logger.info(f"Исключаем нестандартный параметр 'signature': {value[:20]}...")
                             continue
                         # Проверяем разрешенные параметры
                         if key not in allowed_params:
@@ -441,9 +437,9 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         data_to_check[key] = value
             
                 # Дополнительное логирование для отладки
+                logging.info(f"Исходные данные (raw): {init_data_raw}")
+                logging.info(f"Декодированные данные (для разбора): {raw_decoded}")
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
-                logging.info(f"Исходные данные (raw): {init_data_raw[:100]}...")
-                logging.info(f"Декодированные данные (для разбора): {raw_decoded[:100]}...")
             
                 # Сортируем параметры по ключу (лексикографически)
                 sorted_params = sorted(data_to_check.items())
