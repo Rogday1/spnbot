@@ -422,13 +422,17 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 data_to_check = {}
                 
                 # Разрешенные параметры согласно документации Telegram
-                allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param', 'signature']
+                allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
                 
                 for part in parts:
                     if '=' in part:
                         key, value = part.split('=', 1)
                         # Всегда исключаем 'hash'
                         if key == 'hash':
+                            continue
+                        # Исключаем 'signature' - нестандартный параметр
+                        if key == 'signature':
+                            logger.info(f"Исключаем нестандартный параметр 'signature': {value[:20]}...")
                             continue
                         # Проверяем разрешенные параметры
                         if key not in allowed_params:
@@ -437,9 +441,9 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                         data_to_check[key] = value
             
                 # Дополнительное логирование для отладки
-                logging.info(f"Исходные данные (raw): {init_data_raw}")
-                logging.info(f"Декодированные данные (для разбора): {raw_decoded}")
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
+                logging.info(f"Исходные данные (raw): {init_data_raw[:100]}...")
+                logging.info(f"Декодированные данные (для разбора): {raw_decoded[:100]}...")
             
                 # Сортируем параметры по ключу (лексикографически)
                 sorted_params = sorted(data_to_check.items())
@@ -461,8 +465,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Вычисляем хеш с защитой от ошибок
             try:
                 # Логируем данные для вычисления хеша
-                logging.info(f"Секретный ключ: {self.secret_key.hex()}")
-                logging.info(f"Проверочная строка для хеширования: {check_string}")
+                logging.info(f"Проверочная строка для хеширования: {repr(check_string[:100])}...")
                 logging.info(f"Длина проверочной строки: {len(check_string)}")
             
                 computed_hash = hmac.new(
@@ -474,7 +477,6 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 # Логирование для отладки (всегда, не только в DEBUG режиме)
                 logging.info(f"Вычисленный хеш: {computed_hash}")
                 logging.info(f"Полученный хеш: {received_hash}")
-                logging.info(f"Результат сравнения хешей: {hash_match}")
             
                 # Проверяем, совпадают ли первые и последние символы хешей
                 logging.info(f"Первые 10 символов вычисленного хеша: {computed_hash[:10]}")
@@ -485,18 +487,8 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 return {'valid': False, 'error': 'Ошибка при вычислении подписи', 'user_id': None}
             
             # Проверяем хеш с защитой от timing-атак
-            # Сравниваем хеши с защитой от timing-атак
-            try:
-                # Сравниваем хеши с защитой от timing-атак
-                try:
-                    hash_match = hmac.compare_digest(computed_hash, received_hash)
-                    logging.info(f"Результат сравнения хешей: {hash_match}")
-                except Exception as e:
-                    logging.error(f"Ошибка при сравнении хешей: {e}")
-                    return {'valid': False, 'error': 'Ошибка при сравнении подписей', 'user_id': None}
-            except Exception as e:
-                logging.error(f"Ошибка при сравнении хешей: {e}")
-                return {'valid': False, 'error': 'Ошибка при сравнении подписей', 'user_id': None}
+            hash_match = hmac.compare_digest(computed_hash, received_hash)
+            logging.info(f"Результат сравнения хешей: {hash_match}")
             
             if not hash_match:
                 # Детальное логирование ошибки
