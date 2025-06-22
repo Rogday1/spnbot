@@ -487,8 +487,13 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Проверяем хеш с защитой от timing-атак
             # Сравниваем хеши с защитой от timing-атак
             try:
-                hash_match = hmac.compare_digest(computed_hash, received_hash)
-                logging.info(f"Результат сравнения хешей: {hash_match}")
+                # Сравниваем хеши с защитой от timing-атак
+                try:
+                    hash_match = hmac.compare_digest(computed_hash, received_hash)
+                    logging.info(f"Результат сравнения хешей: {hash_match}")
+                except Exception as e:
+                    logging.error(f"Ошибка при сравнении хешей: {e}")
+                    return {'valid': False, 'error': 'Ошибка при сравнении подписей', 'user_id': None}
             except Exception as e:
                 logging.error(f"Ошибка при сравнении хешей: {e}")
                 return {'valid': False, 'error': 'Ошибка при сравнении подписей', 'user_id': None}
