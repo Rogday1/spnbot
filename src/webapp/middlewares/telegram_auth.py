@@ -461,7 +461,8 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Вычисляем хеш с защитой от ошибок
             try:
                 # Логируем данные для вычисления хеша
-                logging.info(f"Проверочная строка для хеширования: {repr(check_string[:100])}...")
+                logging.info(f"Секретный ключ: {self.secret_key.hex()}")
+                logging.info(f"Проверочная строка для хеширования: {check_string}")
                 logging.info(f"Длина проверочной строки: {len(check_string)}")
             
                 computed_hash = hmac.new(
@@ -473,6 +474,7 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 # Логирование для отладки (всегда, не только в DEBUG режиме)
                 logging.info(f"Вычисленный хеш: {computed_hash}")
                 logging.info(f"Полученный хеш: {received_hash}")
+                logging.info(f"Результат сравнения хешей: {hash_match}")
             
                 # Проверяем, совпадают ли первые и последние символы хешей
                 logging.info(f"Первые 10 символов вычисленного хеша: {computed_hash[:10]}")
