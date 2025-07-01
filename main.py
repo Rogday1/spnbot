@@ -12,6 +12,7 @@ from src.utils.cache import start_cache_cleanup_task
 from src.utils.daily_reset_task import schedule_daily_reset
 from src.database.repositories import UserRepository
 #хай
+#gggg
 # Глобальные переменные для хранения задач
 background_tasks = []
 shutdown_event = asyncio.Event()
