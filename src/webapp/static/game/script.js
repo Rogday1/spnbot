@@ -13,6 +13,16 @@ const state = {
     isFreeTicketTimerActive: false
 };
 
+// Простая валидация initData для Telegram WebApp
+function validateTelegramWebAppData(initData) {
+    // Проверяем, что строка не пуста
+    if (typeof initData === 'string' && initData.length > 0) {
+        // Можно добавить дополнительные проверки структуры, если нужно
+        return { valid: true };
+    }
+    return { valid: false, error: 'initData отсутствует или некорректен' };
+}
+
 // Патчим глобальный fetch, чтобы всегда добавлять X-Telegram-Init-Data
 (function() {
     const originalFetch = window.fetch;
