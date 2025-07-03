@@ -11,7 +11,8 @@ from src.database.db import init_db
 from src.utils.cache import start_cache_cleanup_task
 from src.utils.daily_reset_task import schedule_daily_reset
 from src.database.repositories import UserRepository
-
+#хай
+#gggg
 # Глобальные переменные для хранения задач
 background_tasks = []
 shutdown_event = asyncio.Event()
@@ -68,7 +69,6 @@ async def main():
         # Инициализация базы данных
         logging.info("Инициализация базы данных...")
         db_session = await init_db()
-        
         # Если указан флаг --cleanup, запускаем очистку дубликатов и завершаем работу
         if args.cleanup:
             logging.info("Запуск очистки дубликатов пользователей...")
