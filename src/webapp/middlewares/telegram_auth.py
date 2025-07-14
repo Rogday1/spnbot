@@ -11,7 +11,7 @@ import json
 import re
 
 logger = logging.getLogger(__name__)
-
+#пасхалко
 class TelegramAuthMiddleware(BaseHTTPMiddleware):
     """
     Middleware для проверки авторизации Telegram WebApp.
