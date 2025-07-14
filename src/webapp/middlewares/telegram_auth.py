@@ -416,9 +416,8 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 # ВАЖНО: Используем исходные данные (init_data_raw) для правильного формирования проверочной строки
                 # Telegram отправляет данные в URL-encoded виде, и именно в таком виде их нужно проверять
                 
-                # Декодируем исходные данные только один раз для разбора параметров
-                raw_decoded = unquote(init_data_raw)
-                parts = raw_decoded.split('&')
+                # НЕ декодируем исходные данные! split('&') делаем по raw-строке
+                parts = init_data_raw.split('&')
                 data_to_check = {}
                 
                 # Разрешенные параметры согласно документации Telegram
@@ -443,20 +442,19 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 # Дополнительное логирование для отладки
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
                 logging.info(f"Исходные данные (raw): {init_data_raw[:100]}...")
-                logging.info(f"Декодированные данные (для разбора): {raw_decoded[:100]}...")
-            
+                
                 # Сортируем параметры по ключу (лексикографически)
                 sorted_params = sorted(data_to_check.items())
-            
+        
                 # Формируем проверочную строку - ВАЖНО: разделяем параметры символом \n
                 params_list = [f"{key}={value}" for key, value in sorted_params]
                 data_check_string = '\n'.join(params_list)
-            
+        
                 # Логируем отсортированные параметры для проверки
                 logging.info(f"Отсортированные параметры: {[f'{k}={v[:30]}...' for k, v in sorted_params]}")
                 logging.info(f"Проверочная строка (с \\n разделителями): {repr(data_check_string[:200])}...")
                 logging.info(f"Количество параметров в проверочной строке: {len(data_to_check)}")
-            
+        
                 check_string = data_check_string
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
