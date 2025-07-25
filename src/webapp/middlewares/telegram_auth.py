@@ -420,46 +420,24 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             try:
                 # ВАЖНО: Используем исходные данные (init_data_raw) для правильного формирования проверочной строки
                 # Telegram отправляет данные в URL-encoded виде, и именно в таком виде их нужно проверять
-                
-                # НЕ декодируем исходные данные! split('&') делаем по raw-строке
-                parts = init_data_raw.split('&')
-                data_to_check = {}
-                
+
+                from urllib.parse import parse_qsl
                 # Разрешенные параметры согласно документации Telegram
                 allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
-                
-                for part in parts:
-                    if '=' in part:
-                        key, value = part.split('=', 1)
-                        # Всегда исключаем 'hash'
-                        if key == 'hash':
-                            continue
-                        # Исключаем 'signature' - нестандартный параметр
-                        if key == 'signature':
-                            logger.info(f"Исключаем нестандартный параметр 'signature': {value[:20]}...")
-                            continue
-                        # Проверяем разрешенные параметры
-                        if key not in allowed_params:
-                            logger.warning(f"Обнаружен нестандартный параметр: {key}. Он будет исключен из проверочной строки.")
-                            continue
-                        data_to_check[key] = value
-            
-                # Дополнительное логирование для отладки
+
+                # Корректно парсим пары ключ-значение из raw строки (URL-encoded!)
+                pairs = parse_qsl(init_data_raw, keep_blank_values=True)
+                # Фильтруем только разрешённые параметры
+                data_to_check = {k: v for k, v in pairs if k in allowed_params}
+
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
-                logging.info(f"Исходные данные (raw): {init_data_raw[:100]}...")
-                
-                # Сортируем параметры по ключу (лексикографически)
-                sorted_params = sorted(data_to_check.items())
-        
-                # Формируем проверочную строку - ВАЖНО: разделяем параметры символом \n
-                params_list = [f"{key}={value}" for key, value in sorted_params]
-                data_check_string = '\n'.join(params_list)
-        
-                # Логируем отсортированные параметры для проверки
-                logging.info(f"Отсортированные параметры: {[f'{k}={v[:30]}...' for k, v in sorted_params]}")
+
+                # Формируем строку для подписи
+                data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_to_check.items()))
+                logging.info(f"Отсортированные параметры: {[f'{k}={v[:10]}...' for k, v in sorted(data_to_check.items())]}")
                 logging.info(f"Проверочная строка (с \\n разделителями): {repr(data_check_string[:200])}...")
                 logging.info(f"Количество параметров в проверочной строке: {len(data_to_check)}")
-        
+
                 check_string = data_check_string
             except Exception as e:
                 logging.error(f"Ошибка при формировании проверочной строки: {e}")
