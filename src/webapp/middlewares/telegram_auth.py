@@ -418,21 +418,21 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                # ВАЖНО: Используем исходные данные (init_data_raw) для правильного формирования проверочной строки
-                # Telegram отправляет данные в URL-encoded виде, и именно в таком виде их нужно проверять
+                from urllib.parse import parse_qsl, unquote
 
-                from urllib.parse import parse_qsl
-                # Разрешенные параметры согласно документации Telegram
+                # 1. Декодируем init_data_raw
+                decoded_init_data = unquote(init_data_raw)
+
+                # 2. Парсим пары ключ-значение
+                pairs = parse_qsl(decoded_init_data, keep_blank_values=True)
+
+                # 3. Фильтруем только разрешённые параметры
                 allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
-
-                # Корректно парсим пары ключ-значение из raw строки (URL-encoded!)
-                pairs = parse_qsl(init_data_raw, keep_blank_values=True)
-                # Фильтруем только разрешённые параметры
                 data_to_check = {k: v for k, v in pairs if k in allowed_params}
 
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
 
-                # Формируем строку для подписи
+                # 4. Формируем строку для подписи
                 data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_to_check.items()))
                 logging.info(f"Отсортированные параметры: {[f'{k}={v[:10]}...' for k, v in sorted(data_to_check.items())]}")
                 logging.info(f"Проверочная строка (с \\n разделителями): {repr(data_check_string[:200])}...")
