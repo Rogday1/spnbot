@@ -420,19 +420,20 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             try:
                 from urllib.parse import parse_qsl, unquote
 
-                # 1. Декодируем init_data_raw
-                decoded_init_data = unquote(init_data_raw)
-
-                # 2. Парсим пары ключ-значение
-                pairs = parse_qsl(decoded_init_data, keep_blank_values=True)
-
-                # 3. Фильтруем только разрешённые параметры
+                # 1. Разбиваем init_data_raw на пары (значения НЕ декодируем)
+                parts = init_data_raw.split('&')
                 allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
-                data_to_check = {k: v for k, v in pairs if k in allowed_params}
+                data_to_check = {}
+                for part in parts:
+                    if '=' not in part:
+                        continue
+                    k, v = part.split('=', 1)
+                    if k in allowed_params:
+                        data_to_check[k] = v
 
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
 
-                # 4. Формируем строку для подписи
+                # 2. Собираем строку для подписи (значения НЕ декодируем!)
                 data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_to_check.items()))
                 logging.info(f"Отсортированные параметры: {[f'{k}={v[:10]}...' for k, v in sorted(data_to_check.items())]}")
                 logging.info(f"Проверочная строка (с \\n разделителями): {repr(data_check_string[:200])}...")
