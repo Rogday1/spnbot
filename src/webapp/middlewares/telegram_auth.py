@@ -424,12 +424,14 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
                 parts = init_data_raw.split('&')
                 allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
                 data_to_check = {}
+
                 for part in parts:
                     if '=' not in part:
                         continue
                     k, v = part.split('=', 1)
-                    if k in allowed_params:
-                        data_to_check[k] = v
+                    k_decoded = unquote(k)
+                    if k_decoded in allowed_params:
+                        data_to_check[k_decoded] = v  # значение оставляем raw!
 
                 logging.info(f"Параметры для проверки (после фильтрации): {list(data_to_check.keys())}")
 
