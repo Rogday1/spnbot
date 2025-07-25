@@ -45,7 +45,12 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             logging.error("Критическая ошибка: BOT_TOKEN не указан для TelegramAuthMiddleware")
             raise ValueError("BOT_TOKEN не может быть пустым для TelegramAuthMiddleware")
             
-        self.secret_key = hashlib.sha256(self.bot_token.encode()).digest()
+        # Исправлено: derive ключа строго по документации Telegram WebApp
+        self.secret_key = hmac.new(
+            key=self.bot_token.encode(),
+            msg=b'WebAppData',
+            digestmod=hashlib.sha256
+        ).digest()
         
         # Расширенный список исключений для путей, которые не требуют аутентификации
         self.exclude_paths = exclude_paths or [
