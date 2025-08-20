@@ -63,7 +63,7 @@ WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", 8000))
 # URL для мини-приложения
 WEBAPP_PUBLIC_URL = os.getenv("WEBAPP_PUBLIC_URL", "")
 
-# Настройки базы данных
+        # Настройки базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/spin_bot")
 
 # Прямая проверка файла .env (без использования уже загруженных переменных)

@@ -71,7 +71,7 @@ async def update_tables_structure(session: AsyncSession):
     try:
         # Проверяем наличие нужных колонок в таблице users
         try:
-            # PostgreSQL-специфичный код
+            # Универсальный код для проверки колонок
             inspector = await session.run_sync(lambda sync_conn: inspect(sync_conn))
             columns = await session.run_sync(lambda sync_conn: inspector.get_columns('users'))
             column_names = [col['name'] for col in columns]
@@ -175,8 +175,8 @@ async def get_session() -> AsyncSession:
 
 async def optimize_database():
     """
-    Оптимизирует базу данных PostgreSQL.
-    Выполняет VACUUM ANALYZE для оптимизации и обновления статистики.
+    Оптимизирует базу данных.
+    Для PostgreSQL выполняет VACUUM ANALYZE.
     """
     logging.info("Запуск оптимизации базы данных...")
     
@@ -184,7 +184,6 @@ async def optimize_database():
         try:
             # Для PostgreSQL используем VACUUM ANALYZE
             await session.execute(text("VACUUM ANALYZE"))
-            
             logging.info("Оптимизация PostgreSQL базы данных завершена")
             
         except Exception as e:
