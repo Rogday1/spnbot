@@ -33,9 +33,9 @@ function validateTelegramWebAppData(initData) {
             if (!init.headers) init.headers = {};
             // Добавляем X-Telegram-Init-Data, если есть
             if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-                // Кодируем данные для корректной обработки на сервере
-                const encodedData = encodeURIComponent(window.Telegram.WebApp.initData);
-                init.headers['X-Telegram-Init-Data'] = encodedData;
+                // Передаем initData без дополнительного кодирования,
+                // сервер ожидает исходный формат query-string
+                init.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
             }
         }
         return originalFetch(input, init);
