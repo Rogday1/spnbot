@@ -25,6 +25,10 @@ engine = create_async_engine(
     max_overflow=40,  # Максимальное количество дополнительных соединений
     pool_timeout=30,  # Тайм-аут ожидания соединения из пула
     pool_pre_ping=True,  # Проверка соединения перед использованием
+    # Важно для PgBouncer (pool_mode transaction/statement): отключаем prepared statements
+    connect_args={
+        "statement_cache_size": 0,
+    },
 )
 
 # Создаем фабрику сессий
