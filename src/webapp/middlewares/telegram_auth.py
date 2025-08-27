@@ -418,8 +418,6 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
             # Формируем проверочную строку строго по документации Telegram
             # https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
             try:
-                from urllib.parse import parse_qsl, unquote
-
                 # 1. Разбиваем init_data_raw на пары (значения НЕ декодируем)
                 parts = init_data_raw.split('&')
                 allowed_params = ['auth_date', 'query_id', 'user', 'receiver', 'chat', 'chat_type', 'start_param']
