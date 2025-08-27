@@ -27,7 +27,11 @@ engine = create_async_engine(
     pool_pre_ping=True,  # Проверка соединения перед использованием
     # Важно для PgBouncer (pool_mode transaction/statement): отключаем prepared statements
     connect_args={
+        # Для PgBouncer (transaction/statement) отключаем использование prepared statements
+        # Параметры передаются напрямую в asyncpg
         "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "prepare_threshold": 0,
     },
 )
 
