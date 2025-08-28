@@ -17,8 +17,16 @@ TEST_USER_ID = 123456789
 # Создаем асинхронный движок для работы с PostgreSQL
 async_database_url = settings.DATABASE_URL.replace('postgresql:', 'postgresql+asyncpg:')
 
-# Для Supabase не передаем дополнительные SSL параметры в connect_args
-# SSL настройки уже указаны в URL (sslmode=require)
+# Убираем sslmode из URL, так как он вызывает проблемы с asyncpg
+if '?sslmode=require' in async_database_url:
+    async_database_url = async_database_url.replace('?sslmode=require', '')
+
+# Для Supabase используем SSL через connect_args
+ssl_params = {}
+if 'supabase.co' in settings.DATABASE_URL:
+    ssl_params = {
+        'ssl': True
+    }
 
 engine = create_async_engine(
     async_database_url,
@@ -28,7 +36,7 @@ engine = create_async_engine(
     max_overflow=40,  # Максимальное количество дополнительных соединений
     pool_timeout=30,  # Тайм-аут ожидания соединения из пула
     pool_pre_ping=True,  # Проверка соединения перед использованием
-    # Убираем connect_args - SSL настройки уже в URL
+    connect_args=ssl_params,
 )
 
 # Создаем фабрику сессий
