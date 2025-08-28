@@ -45,13 +45,14 @@ def create_env_file():
         print("Содержимое .env файла:")
         for line in env_content:
             print(f"  {line}")
+        
+        # Загружаем переменные из .env файла в окружение
+        from dotenv import load_dotenv
+        load_dotenv(env_path, override=True)
+        print("Переменные загружены из .env файла")
 
-# Создаем .env файл перед загрузкой
+# Создаем .env файл и загружаем переменные
 create_env_file()
-
-# Загружаем переменные окружения
-from dotenv import load_dotenv
-load_dotenv()
 
 # Отладочная информация
 print("=== Отладочная информация ===")
@@ -66,23 +67,6 @@ BASE_DIR = Path(__file__).parent.parent.parent
 
 # Определяем путь к файлу .env
 env_path = BASE_DIR / '.env'
-
-# Проверяем существование файла .env
-if env_path.exists():
-    try:
-        # Загрузка переменных окружения из .env файла с поддержкой UTF-8
-        load_dotenv(dotenv_path=env_path, encoding='utf-8')
-        print(f"Загружены переменные окружения из файла {env_path} (UTF-8)")
-    except Exception as e:
-        # Если UTF-8 не сработало, пробуем с другой кодировкой
-        print(f"Ошибка при загрузке .env с UTF-8: {e}")
-        try:
-            load_dotenv(dotenv_path=env_path, encoding='cp1251')
-            print(f"Загружены переменные окружения из файла {env_path} (CP1251)")
-        except Exception as e2:
-            print(f"Ошибка при загрузке .env с CP1251: {e2}")
-else:
-    print(f"Файл .env не найден по пути {env_path}")
 
 # Настройки логирования - ПЕРЕМЕЩЕНО ПОСЛЕ загрузки переменных окружения
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -118,49 +102,8 @@ WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", 8000))
 # URL для мини-приложения
 WEBAPP_PUBLIC_URL = os.getenv("WEBAPP_PUBLIC_URL", "")
 
-        # Настройки базы данных
+# Настройки базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/spin_bot")
-
-# Прямая проверка файла .env (без использования уже загруженных переменных)
-if env_path.exists():
-    try:
-        with open(env_path, 'r', encoding='utf-8') as f:
-            env_content = f.read()
-            
-        # Ищем строку с WEBAPP_PUBLIC_URL
-        webapp_url_match = re.search(r'^WEBAPP_PUBLIC_URL=(.+)$', env_content, re.MULTILINE)
-        
-        if webapp_url_match:
-            # Получаем значение URL из .env напрямую
-            env_url = webapp_url_match.group(1).strip()
-            
-            # Записываем напрямую в переменную окружения
-            if env_url and env_url != WEBAPP_PUBLIC_URL:
-                logging.warning(f"Обнаружено расхождение: URL из .env файла: {env_url}, а в переменной окружения: {WEBAPP_PUBLIC_URL}")
-                
-                # Принудительно устанавливаем значение из .env
-                os.environ["WEBAPP_PUBLIC_URL"] = env_url
-                WEBAPP_PUBLIC_URL = env_url
-                logging.info(f"URL установлен в: {WEBAPP_PUBLIC_URL}")
-    except Exception as e:
-        logging.error(f"Ошибка при прямом чтении URL из .env: {e}")
-
-# Делаем окончательную проверку и очистку URL
-if WEBAPP_PUBLIC_URL:
-    WEBAPP_PUBLIC_URL = WEBAPP_PUBLIC_URL.strip()
-    
-    # Проверим, что URL начинается с https://
-    if not WEBAPP_PUBLIC_URL.startswith("https://"):
-        logging.warning(f"URL не начинается с https://: {WEBAPP_PUBLIC_URL}")
-        if WEBAPP_PUBLIC_URL.startswith("http://"):
-            https_url = "https://" + WEBAPP_PUBLIC_URL[7:]
-            logging.warning(f"URL автоматически преобразован в HTTPS: {https_url}")
-            WEBAPP_PUBLIC_URL = https_url
-    
-    # Экспортируем значение в окружение для гарантии доступности другим модулям
-    os.environ["WEBAPP_PUBLIC_URL"] = WEBAPP_PUBLIC_URL
-else:
-    logging.warning("WEBAPP_PUBLIC_URL не определен в .env файле")
 
 # Настройки безопасности
 # Генерируем случайный ключ для сессий и подписей, если его нет в переменных окружения
