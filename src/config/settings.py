@@ -12,14 +12,15 @@ def create_env_file():
     # Основные переменные
     bot_token = os.getenv('BOT_TOKEN')
     if bot_token:
-        # Убираем лишние кавычки и пробелы
-        bot_token = bot_token.strip().strip('"').strip("'")
-        env_content.append(f'BOT_TOKEN={bot_token}')
+        # Убираем лишние кавычки, пробелы и символы
+        bot_token = bot_token.strip().strip('"').strip("'").strip('=').strip()
+        if bot_token:
+            env_content.append(f'BOT_TOKEN={bot_token}')
     
     database_url = os.getenv('DATABASE_URL')
     if database_url:
         # Убираем лишние кавычки и пробелы
-        database_url = database_url.strip().strip('"').strip("'")
+        database_url = database_url.strip().strip('"').strip("'").strip(';').strip()
         # Заменяем ssl=true на sslmode=require для совместимости
         if '?ssl=true' in database_url:
             database_url = database_url.replace('?ssl=true', '?sslmode=require')
@@ -27,12 +28,12 @@ def create_env_file():
     
     debug = os.getenv('DEBUG')
     if debug:
-        debug = debug.strip().strip('"').strip("'")
+        debug = debug.strip().strip('"').strip("'").strip(';').strip()
         env_content.append(f'DEBUG={debug}')
     
     webapp_url = os.getenv('WEBAPP_PUBLIC_URL')
     if webapp_url:
-        webapp_url = webapp_url.strip().strip('"').strip("'")
+        webapp_url = webapp_url.strip().strip('"').strip("'").strip(';').strip()
         env_content.append(f'WEBAPP_PUBLIC_URL={webapp_url}')
     
     # Записываем в .env файл
@@ -41,6 +42,9 @@ def create_env_file():
         with open(env_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(env_content))
         print(f"Создан .env файл с {len(env_content)} переменными")
+        print("Содержимое .env файла:")
+        for line in env_content:
+            print(f"  {line}")
 
 # Создаем .env файл перед загрузкой
 create_env_file()

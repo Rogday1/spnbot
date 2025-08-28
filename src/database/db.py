@@ -20,10 +20,8 @@ async_database_url = settings.DATABASE_URL.replace('postgresql:', 'postgresql+as
 # Определяем SSL параметры для Supabase
 ssl_params = {}
 if 'supabase.co' in settings.DATABASE_URL:
-    # Для Supabase используем sslmode=require
-    ssl_params = {
-        'sslmode': 'require'
-    }
+    # Для Supabase не передаем sslmode в connect_args, он уже в URL
+    ssl_params = {}
 
 engine = create_async_engine(
     async_database_url,
