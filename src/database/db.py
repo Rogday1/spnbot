@@ -168,6 +168,12 @@ async def create_indexes(conn):
         await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date)"))
         await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_daily_stats_total_win ON daily_stats(total_wins)"))
         
+        # Индексы для таблиц розыгрышей
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_giveaways_status ON giveaways(status)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_giveaways_ends_at ON giveaways(ends_at)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_entries_giveaway_id ON giveaway_entries(giveaway_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_entries_user_id ON giveaway_entries(user_id)"))
+
         logging.info("Индексы базы данных созданы успешно")
     except Exception as e:
         logging.warning(f"Ошибка при создании индексов: {e}")

@@ -193,6 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (isVisible && tabId === 'tab-leaders') {
                         fetchLeaders();
                     }
+                    // Если открыта вкладка розыгрышей, подгружаем список
+                    if (isVisible && tabId === 'tab-giveaways') {
+                        fetchGiveaways();
+                    }
                 });
             });
         });
@@ -296,6 +300,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetchUserData();
                 DOM.spinbutton.disabled = state.tickets <= 0;
             });
+        }
+    }
+
+    async function fetchGiveaways() {
+        try {
+            const items = await makeApiRequest('/api/giveaways/active');
+            const list = document.getElementById('giveaways-list');
+            const empty = document.getElementById('giveaways-empty');
+            if (!list) return;
+            list.innerHTML = '';
+            if (!items || items.length === 0) {
+                if (empty) empty.style.display = 'block';
+                return;
+            }
+            if (empty) empty.style.display = 'none';
+            items.forEach(g => {
+                const row = document.createElement('div');
+                row.className = 'leader-row';
+                row.innerHTML = `
+                    <div class="col-name">${g.title}</div>
+                    <div class="col-score">${g.prize || ''}</div>
+                `;
+                const btn = document.createElement('button');
+                btn.className = 'submit-button';
+                btn.textContent = 'Участвовать';
+                btn.addEventListener('click', async () => {
+                    try {
+                        const res = await makeApiRequest(`/api/giveaways/${g.id}/join`, 'POST', {});
+                        if (res && res.success) {
+                            alert('Вы участвуете! Участников: ' + res.total);
+                        } else {
+                            alert('Не удалось участвовать');
+                        }
+                    } catch (e) {
+                        alert('Ошибка участия');
+                    }
+                });
+                row.appendChild(btn);
+                list.appendChild(row);
+            });
+        } catch (e) {
+            console.error('Ошибка загрузки розыгрышей', e);
         }
     }
     

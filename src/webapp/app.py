@@ -10,7 +10,7 @@ from pathlib import Path
 import asyncio
 
 from src.config import settings
-from src.webapp.routers import user_router, game_router, leaders_router
+from src.webapp.routers import user_router, game_router, leaders_router, giveaways_router
 from src.webapp.middlewares import TelegramAuthMiddleware, RateLimiterMiddleware, SubscriptionCheckMiddleware
 
 # Получаем абсолютный путь до директории со статическими файлами
@@ -96,6 +96,7 @@ def setup_webapp(bot: Bot) -> FastAPI:
     app.include_router(user_router)
     app.include_router(game_router)
     app.include_router(leaders_router)
+    app.include_router(giveaways_router)
     
     # Настройка корневого пути
     @app.get("/")
