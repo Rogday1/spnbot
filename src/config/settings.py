@@ -54,6 +54,13 @@ def create_env_file():
 # Создаем .env файл и загружаем переменные
 create_env_file()
 
+# Загружаем .env файл если он существует
+env_path = Path('.env')
+if env_path.exists():
+    from dotenv import load_dotenv
+    load_dotenv(env_path, override=True)
+    print("Загружен .env файл")
+
 # Отладочная информация
 print("=== Отладочная информация ===")
 print(f"BOT_TOKEN из окружения: '{os.getenv('BOT_TOKEN')}'")
@@ -97,10 +104,30 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
 
 # Настройки веб-приложения
 WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")
-WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", 8000))
+WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", 8001))
 
 # URL для мини-приложения
-WEBAPP_PUBLIC_URL = os.getenv("WEBAPP_PUBLIC_URL", "")
+WEBAPP_PUBLIC_URL = os.getenv("WEBAPP_PUBLIC_URL", "http://localhost:8001")
+
+def reload_settings():
+    """Принудительно перезагружает настройки из .env файла"""
+    global WEBAPP_PUBLIC_URL, BOT_TOKEN, DATABASE_URL, DEBUG
+    
+    # Загружаем .env файл заново
+    env_path = Path('.env')
+    if env_path.exists():
+        from dotenv import load_dotenv
+        load_dotenv(env_path, override=True)
+        print("🔄 Настройки перезагружены из .env файла")
+    
+    # Обновляем переменные
+    WEBAPP_PUBLIC_URL = os.getenv("WEBAPP_PUBLIC_URL", "http://localhost:8001")
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/spin_bot")
+    DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+    
+    print(f"✅ WEBAPP_PUBLIC_URL обновлен: {WEBAPP_PUBLIC_URL}")
+    return WEBAPP_PUBLIC_URL
 
 # Настройки базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/spin_bot")

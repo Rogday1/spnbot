@@ -1,20 +1,17 @@
 from aiogram.filters import BaseFilter
 from aiogram.types import Message, CallbackQuery
-import os
-from typing import Union, Dict, Any
-from dotenv import load_dotenv
-
-# Загружаем переменные окружения
-load_dotenv()
+from typing import Union
+import logging
 
 class AdminFilter(BaseFilter):
     """
     Фильтр для проверки, является ли пользователь администратором
+    Проверяет права администратора по базе данных (поле is_admin)
     """
     
     async def __call__(self, event: Union[Message, CallbackQuery]) -> bool:
         """
-        Выполняет проверку на администратора
+        Выполняет проверку на администратора через базу данных
         
         Args:
             event (Union[Message, CallbackQuery]): Событие от пользователя
@@ -22,18 +19,29 @@ class AdminFilter(BaseFilter):
         Returns:
             bool: True, если пользователь администратор, иначе False
         """
-        # Определяем ID пользователя в зависимости от типа события
-        user_id = event.from_user.id
-        
-        # Получаем список ID администраторов из переменной окружения
-        admins_str = os.getenv("ADMINS_ID", "")
-        
-        # Проверяем, есть ли администраторы в переменной окружения
-        if not admins_str:
-            return False
+        user_id = None
+        try:
+            # Определяем ID пользователя в зависимости от типа события
+            user_id = event.from_user.id
             
-        # Преобразуем строку с ID администраторов в список целых чисел
-        admin_ids = [int(admin_id.strip()) for admin_id in admins_str.split(",") if admin_id.strip()]
-        
-        # Проверяем, является ли пользователь администратором
-        return user_id in admin_ids 
+            # Импортируем здесь, чтобы избежать циклических импортов
+            from src.database.db import get_session
+            from src.database.repositories.user_repository import UserRepository
+            
+            # Проверяем права администратора в базе данных
+            async for session in get_session():
+                user_repo = UserRepository(session)
+                user = await user_repo.get_user(user_id)
+                
+                if user and user.is_admin:
+                    logging.info(f"✓ Пользователь {user_id} является администратором")
+                    return True
+                else:
+                    logging.warning(f"✗ Пользователь {user_id} НЕ является администратором (user={user}, is_admin={user.is_admin if user else 'None'})")
+                    return False
+                    
+        except Exception as e:
+            logging.error(f"✗ Ошибка при проверке прав администратора для пользователя {user_id}: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return False 

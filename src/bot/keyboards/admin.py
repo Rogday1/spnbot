@@ -11,26 +11,56 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
     """
     # Создаем кнопки с соответствующими коллбэк-данными
     max_win_button = InlineKeyboardButton(
-        text="Назначить максимальный выигрыш за эти сутки",
+        text="💰 Назначить максимальный выигрыш за сутки",
         callback_data=AdminCallback(action="set_max_win").pack()
     )
     
+    prizes_button = InlineKeyboardButton(
+        text="🎁 Управление призами",
+        callback_data=AdminCallback(action="manage_prizes").pack()
+    )
+    
+    giveaways_button = InlineKeyboardButton(
+        text="🎉 Управление розыгрышами",
+        callback_data=AdminCallback(action="manage_giveaways").pack()
+    )
+    
     add_channel_button = InlineKeyboardButton(
-        text="Добавить канал в требуемые подписки",
+        text="📢 Добавить канал в требуемые подписки",
         callback_data=AdminCallback(action="add_channel").pack()
     )
     
     list_channels_button = InlineKeyboardButton(
-        text="Список требуемых каналов",
+        text="📋 Список требуемых каналов",
         callback_data=AdminCallback(action="list_channels").pack()
+    )
+    
+    stats_button = InlineKeyboardButton(
+        text="📊 Статистика бота",
+        callback_data=AdminCallback(action="bot_stats").pack()
+    )
+    
+    webapp_button = InlineKeyboardButton(
+        text="🌐 Настроить WebApp",
+        callback_data=AdminCallback(action="setup_webapp").pack()
+    )
+    
+    reload_button = InlineKeyboardButton(
+        text="🔄 Перезагрузить настройки",
+        callback_data=AdminCallback(action="reload_settings").pack()
     )
     
     # Собираем и возвращаем клавиатуру
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [max_win_button],
+            [prizes_button],
+            [giveaways_button],
             [add_channel_button],
-            [list_channels_button]
+            [list_channels_button],
+            [stats_button],
+            [webapp_button],
+            [reload_button]
         ]
     )
 

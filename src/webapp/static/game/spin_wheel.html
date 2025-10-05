@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
-    <link rel="stylesheet" href="/static/game/style.css">
+    <link rel="stylesheet" href="style.css">
     
     <!-- Стили для предотвращения мелькания контента -->
     <style>
@@ -29,7 +29,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #B39DDB 0%, #7E57C2 50%, #5E35B1 100%);
+            background: linear-gradient(135deg, #F8BBD9 0%, #E91E63 50%, #C2185B 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -55,15 +55,503 @@
             to { transform: rotate(360deg); }
         }
         
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px rgba(233, 30, 99, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(233, 30, 99, 0.6); }
+            100% { box-shadow: 0 0 5px rgba(233, 30, 99, 0.3); }
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
         .app-container {
-            visibility: hidden;
-            opacity: 0;
+            visibility: visible;
+            opacity: 1;
             transition: opacity 0.3s ease, visibility 0.3s ease;
         }
         
         .app-container.loaded {
             visibility: visible;
             opacity: 1;
+        }
+        
+        /* Принудительные розовые стили */
+        body {
+            background: linear-gradient(135deg, #FCE4EC 0%, #F8BBD9 50%, #E91E63 100%) !important;
+            color: #2E2E2E !important;
+            min-height: 100vh !important;
+        }
+        
+        .app-container {
+            background: linear-gradient(135deg, #FCE4EC 0%, #F8BBD9 50%, #E91E63 100%) !important;
+            min-height: 100vh !important;
+        }
+        
+        /* Добавляем декоративные элементы */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(233, 30, 99, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(248, 187, 217, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(194, 24, 91, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        /* Добавляем плавающие частицы */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, rgba(233, 30, 99, 0.3), transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(248, 187, 217, 0.3), transparent),
+                radial-gradient(1px 1px at 90px 40px, rgba(194, 24, 91, 0.3), transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(233, 30, 99, 0.3), transparent),
+                radial-gradient(2px 2px at 160px 30px, rgba(248, 187, 217, 0.3), transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: float 20s ease-in-out infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .nav-item {
+            color: white !important;
+            transition: all 0.3s ease !important;
+            position: relative !important;
+        }
+        
+        .nav-item:hover {
+            color: #F8BBD9 !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        .nav-item.active {
+            color: #F8BBD9 !important;
+            animation: pulse 2s ease-in-out infinite !important;
+        }
+        
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: white;
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+        
+        .nav-item:hover::before,
+        .nav-item.active::before {
+            width: 80%;
+        }
+        
+        .spin-button {
+            background: linear-gradient(135deg, #E91E63, #F8BBD9) !important;
+            color: white !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3) !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+        
+        .spin-button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4) !important;
+        }
+        
+        .spin-button:active {
+            transform: translateY(0) !important;
+            box-shadow: 0 2px 10px rgba(233, 30, 99, 0.3) !important;
+        }
+        
+        .spin-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .spin-button:hover::before {
+            left: 100%;
+        }
+        
+        .wheel-container {
+            background: #F8BBD9 !important;
+            border: 3px solid #E91E63 !important;
+            border-radius: 50% !important;
+            width: 300px !important;
+            height: 300px !important;
+            margin: 20px auto !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            position: relative !important;
+            box-shadow: 0 8px 32px rgba(233, 30, 99, 0.3) !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .wheel-container:hover {
+            transform: scale(1.02) !important;
+            box-shadow: 0 12px 40px rgba(233, 30, 99, 0.4) !important;
+        }
+        
+        .wheel-container svg {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 50% !important;
+        }
+        
+        .wheel-marker {
+            position: absolute !important;
+            top: -10px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            width: 0 !important;
+            height: 0 !important;
+            border-left: 15px solid transparent !important;
+            border-right: 15px solid transparent !important;
+            border-top: 25px solid #E91E63 !important;
+            z-index: 10 !important;
+            animation: float 2s ease-in-out infinite !important;
+        }
+        
+        /* Анимации для информационных карточек */
+        .info-card {
+            transition: all 0.3s ease !important;
+            box-shadow: 0 2px 10px rgba(233, 30, 99, 0.1) !important;
+        }
+        
+        .info-card:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 4px 20px rgba(233, 30, 99, 0.2) !important;
+        }
+        
+        /* Анимация для баланса */
+        .balance-card {
+            animation: glow 3s ease-in-out infinite !important;
+        }
+        
+        /* Стили для улучшенной вкладки розыгрышей */
+        .prizes-section, .giveaways-section {
+            margin-bottom: 30px;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(248, 187, 217, 0.1));
+            border-radius: 15px;
+            border: 1px solid rgba(233, 30, 99, 0.2);
+        }
+        
+        .section-icon {
+            font-size: 24px;
+            color: #E91E63;
+            margin-right: 12px;
+        }
+        
+        .section-header h2 {
+            color: #E91E63;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .prizes-grid, .giveaways-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(248, 187, 217, 0.1);
+            border-radius: 15px;
+            border: 2px dashed rgba(233, 30, 99, 0.3);
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            color: #E91E63;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .empty-state p {
+            color: #E91E63;
+            font-size: 18px;
+            font-weight: 500;
+            margin: 0 0 8px 0;
+        }
+        
+        .empty-state small {
+            color: #C2185B;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        /* Стили для карточек призов и розыгрышей */
+        .prize-card, .giveaway-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.1);
+            border: 1px solid rgba(233, 30, 99, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .prize-card:hover, .giveaway-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(233, 30, 99, 0.2);
+        }
+        
+        .prize-card h3, .giveaway-card h3 {
+            color: #E91E63;
+            font-size: 18px;
+            margin: 0 0 10px 0;
+        }
+        
+        .prize-card p, .giveaway-card p {
+            color: #666;
+            font-size: 14px;
+            margin: 0 0 15px 0;
+            line-height: 1.4;
+        }
+        
+        .prize-value {
+            background: linear-gradient(135deg, #E91E63, #F8BBD9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 16px;
+            display: inline-block;
+        }
+        
+        .join-button {
+            background: linear-gradient(135deg, #E91E63, #F8BBD9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .join-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+        }
+        
+        .join-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* Стили для улучшенной вкладки рефералов */
+        .referral-info-section, .referral-link-section, .referral-stats-section, .referral-actions-section {
+            margin-bottom: 30px;
+        }
+        
+        .info-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.1);
+            border: 1px solid rgba(233, 30, 99, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .info-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(233, 30, 99, 0.2);
+        }
+        
+        .info-card p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 0;
+        }
+        
+        .referral-link-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.1);
+            border: 1px solid rgba(233, 30, 99, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .referral-link-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(233, 30, 99, 0.2);
+        }
+        
+        .link-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .referral-link-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid rgba(233, 30, 99, 0.2);
+            border-radius: 25px;
+            font-size: 16px;
+            background: #f8f9fa;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+        
+        .referral-link-input:focus {
+            outline: none;
+            border-color: #E91E63;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.1);
+        }
+        
+        .copy-button {
+            background: linear-gradient(135deg, #E91E63, #F8BBD9);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 50px;
+            height: 50px;
+        }
+        
+        .copy-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .stats-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.1);
+            border: 1px solid rgba(233, 30, 99, 0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .stats-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(233, 30, 99, 0.2);
+        }
+        
+        .stats-icon {
+            background: linear-gradient(135deg, #E91E63, #F8BBD9);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .stats-content {
+            flex: 1;
+        }
+        
+        .stats-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #E91E63;
+            margin-bottom: 5px;
+        }
+        
+        .stats-label {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .action-button {
+            background: white;
+            border: 2px solid rgba(233, 30, 99, 0.2);
+            border-radius: 15px;
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-weight: 600;
+            color: #E91E63;
+        }
+        
+        .action-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(233, 30, 99, 0.2);
+            border-color: #E91E63;
+        }
+        
+        .telegram-button:hover {
+            background: linear-gradient(135deg, #0088cc, #E91E63);
+            color: white;
+        }
+        
+        .copy-button-main:hover {
+            background: linear-gradient(135deg, #E91E63, #F8BBD9);
+            color: white;
         }
         
         /* Скрываем все модальные окна по умолчанию */
@@ -80,6 +568,14 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Обработчик инициализации Telegram WebApp -->
     <script>
+        // Принудительно загружаем CSS
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'style.css';
+        link.onload = () => console.log('CSS загружен успешно');
+        link.onerror = () => console.error('Ошибка загрузки CSS');
+        document.head.appendChild(link);
+        
         try {
             // Инициализируем Telegram WebApp 
             if (window.Telegram && window.Telegram.WebApp) {
@@ -270,43 +766,79 @@
             
             <div class="tab-content" id="tab-referral">
                 <div class="container">
-                    <h1>Реферальная ссылка</h1>
-                    <div class="card-container referral-card">
-                        <div class="referral-info">
-                            <div class="referral-header">
-                                <span class="material-icons-round">campaign</span>
+                    <h1>👥 Реферальная программа</h1>
+                    <div class="card-container">
+                        <!-- Секция информации -->
+                        <div class="referral-info-section">
+                            <div class="section-header">
+                                <span class="material-icons-round section-icon">campaign</span>
                                 <h2>Приглашай друзей и получай бонусы!</h2>
                             </div>
-                            <p class="referral-description">За каждого приглашённого друга вы получите дополнительные билеты для игры и бонусные баллы!</p>
+                            <div class="info-card">
+                                <p>За каждого приглашённого друга вы получите дополнительные билеты для игры и бонусные баллы!</p>
+                            </div>
                         </div>
                         
-                        <div class="referral-link-container">
-                            <div class="referral-link-label">Ваша уникальная ссылка:</div>
-                            <div class="referral-link-block">
-                                <input type="text" id="referral-link" class="referral-link" value="Загрузка..." readonly>
-                                <button id="copy-link" class="copy-button" title="Скопировать">
+                        <!-- Секция ссылки -->
+                        <div class="referral-link-section">
+                            <div class="section-header">
+                                <span class="material-icons-round section-icon">link</span>
+                                <h2>Ваша реферальная ссылка</h2>
+                            </div>
+                            <div class="referral-link-card">
+                                <div class="link-container">
+                                    <input type="text" id="referral-link" class="referral-link-input" value="Загрузка..." readonly>
+                                    <button id="copy-link" class="copy-button" title="Скопировать">
+                                        <span class="material-icons-round">content_copy</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Секция статистики -->
+                        <div class="referral-stats-section">
+                            <div class="section-header">
+                                <span class="material-icons-round section-icon">analytics</span>
+                                <h2>Ваша статистика</h2>
+                            </div>
+                            <div class="stats-grid">
+                                <div class="stats-card">
+                                    <div class="stats-icon">
+                                        <span class="material-icons-round">group</span>
+                                    </div>
+                                    <div class="stats-content">
+                                        <div class="stats-value" id="invited-count">0</div>
+                                        <div class="stats-label">Приглашённых друзей</div>
+                                    </div>
+                                </div>
+                                <div class="stats-card">
+                                    <div class="stats-icon">
+                                        <span class="material-icons-round">confirmation_number</span>
+                                    </div>
+                                    <div class="stats-content">
+                                        <div class="stats-value" id="bonus-tickets">0</div>
+                                        <div class="stats-label">Бонусных билетов</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Секция действий -->
+                        <div class="referral-actions-section">
+                            <div class="section-header">
+                                <span class="material-icons-round section-icon">share</span>
+                                <h2>Поделиться</h2>
+                            </div>
+                            <div class="actions-grid">
+                                <button class="action-button telegram-button" id="share-telegram">
+                                    <span class="material-icons-round">send</span>
+                                    <span>Telegram</span>
+                                </button>
+                                <button class="action-button copy-button-main" id="copy-link-main">
                                     <span class="material-icons-round">content_copy</span>
+                                    <span>Скопировать</span>
                                 </button>
                             </div>
-                        </div>
-                        
-                        <div class="referral-stats-container">
-                            <div class="referral-stats-card">
-                                <div class="stats-icon-wrapper">
-                                    <span class="material-icons-round referral-icon">group</span>
-                                </div>
-                                <div class="stats-content">
-                                    <div class="stats-value" id="invited-count">0</div>
-                                    <div class="stats-label">Приглашённых друзей</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="referral-share">
-                            <button class="share-button" id="share-telegram">
-                                <span class="material-icons-round">send</span>
-                                Поделиться в Telegram
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -314,18 +846,42 @@
 
             <div class="tab-content" id="tab-giveaways">
                 <div class="container">
-                    <h1>Розыгрыши</h1>
+                    <h1>🎰 Призы и Розыгрыши</h1>
                     <div class="card-container">
-                        <div id="giveaways-list" class="leaders-list">
-                            <!-- Список розыгрышей будет заполнен динамически -->
+                        <!-- Секция призов -->
+                        <div class="prizes-section">
+                            <div class="section-header">
+                                <span class="material-icons-round section-icon">redeem</span>
+                                <h2>Доступные призы</h2>
+                            </div>
+                            <div id="prizes-container" class="prizes-grid">
+                                <!-- Список призов будет заполнен динамически -->
+                            </div>
+                            <div class="empty-state" id="prizes-empty">
+                                <span class="material-icons-round empty-icon">card_giftcard</span>
+                                <p>Призы загружаются...</p>
+                            </div>
                         </div>
-                        <div class="leaders-empty" id="giveaways-empty">
-                            <span class="material-icons-round" style="font-size: 32px; color: #B39DDB; vertical-align: middle;">redeem</span>
-                            <span style="margin-left: 10px; color: #B39DDB; font-size: 18px;">Сейчас нет активных розыгрышей</span>
+                        
+                        <!-- Секция розыгрышей -->
+                        <div class="giveaways-section">
+                            <div class="section-header">
+                                <span class="material-icons-round section-icon">celebration</span>
+                                <h2>Активные розыгрыши</h2>
+                            </div>
+                            <div id="giveaways-list" class="giveaways-grid">
+                                <!-- Список розыгрышей будет заполнен динамически -->
+                            </div>
+                            <div class="empty-state" id="giveaways-empty">
+                                <span class="material-icons-round empty-icon">party_mode</span>
+                                <p>Сейчас нет активных розыгрышей</p>
+                                <small>Следите за обновлениями!</small>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+            
         </div>
         
         <nav class="bottom-nav">

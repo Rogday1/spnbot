@@ -830,4 +830,82 @@ class UserRepository:
             return {
                 "total_referrals": 0,
                 "top_referrals": []
-            } 
+            }
+    
+    async def add_referral(self, referrer_id: int, referred_id: int) -> bool:
+        """
+        Добавляет реферала для пользователя
+        
+        Args:
+            referrer_id (int): ID пользователя, который пригласил
+            referred_id (int): ID пользователя, которого пригласили
+            
+        Returns:
+            bool: True, если реферал был успешно добавлен
+        """
+        try:
+            # Получаем реферера
+            referrer = await self.get_user(referrer_id)
+            if not referrer:
+                return False
+            
+            # Получаем реферала
+            referred = await self.get_user(referred_id)
+            if not referred:
+                return False
+            
+            # Проверяем, что пользователь еще не был приглашен
+            if referred.referred_by is not None:
+                return False
+            
+            # Устанавливаем связь реферала
+            referred.referred_by = referrer_id
+            await self.update_user(referred)
+            
+            # Добавляем реферала рефереру
+            referrer.add_referral()
+            await self.update_user(referrer)
+            
+            # Инвалидируем кэш
+            await cache.delete(f"referral_count:{referrer_id}")
+            await cache.delete(f"referral_stats:{referrer_id}")
+            await cache.delete(f"referrals:{referrer_id}:10:0")
+            
+            logging.info(f"Пользователь {referred_id} добавлен как реферал пользователя {referrer_id}")
+            return True
+            
+        except Exception as e:
+            logging.exception(f"Ошибка при добавлении реферала {referred_id} для пользователя {referrer_id}: {e}")
+            return False
+    
+    async def add_referral_earnings(self, referrer_id: int, amount: int) -> bool:
+        """
+        Добавляет заработок от реферала
+        
+        Args:
+            referrer_id (int): ID реферера
+            amount (int): Сумма заработка
+            
+        Returns:
+            bool: True, если заработок был добавлен
+        """
+        try:
+            referrer = await self.get_user(referrer_id)
+            if not referrer:
+                return False
+            
+            # Добавляем заработок
+            referrer.add_referral_earnings(amount)
+            await self.update_user(referrer)
+            
+            # Инвалидируем кэш
+            await cache.delete(f"user:{referrer_id}")
+            await cache.delete(f"get_user_by_id:{referrer_id}")
+            await cache.delete(f"referral_stats:{referrer_id}")
+            
+            logging.info(f"Добавлен заработок {amount} от реферала для пользователя {referrer_id}")
+            return True
+            
+        except Exception as e:
+            logging.exception(f"Ошибка при добавлении заработка от реферала для пользователя {referrer_id}: {e}")
+            return False 

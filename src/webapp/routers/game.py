@@ -11,7 +11,7 @@ import random
 import re
 
 from src.database.db import get_session
-from src.database.repositories import UserRepository, GameRepository, DailyStatsRepository
+from src.database.repositories import UserRepository, GameRepository, DailyStatsRepository, PrizeRepository
 from src.config import settings
 from src.utils.probability_manager import calculate_probabilities, select_winning_sector
 
@@ -65,6 +65,9 @@ class SpinResult(BaseModel):
     result: Optional[str] = Field(None, description="Результат прокрутки")
     time_until_next_spin: Optional[str] = Field(None, description="Время до следующего бесплатного прокрута")
     message: Optional[str] = Field(None, description="Сообщение об ошибке или уведомление")
+    prize: Optional[Dict[str, Any]] = Field(None, description="Информация о выигранном призе")
+    is_win: bool = Field(False, description="Выигрыш или нет")
+    win_amount: int = Field(0, description="Сумма выигрыша")
 
 # Новая модель для ответа на запрос предсказания результата прокрутки
 class SpinPredictionResult(BaseModel):
@@ -181,6 +184,7 @@ async def spin_wheel(
         user_repo = UserRepository(session)
         game_repo = GameRepository(session)
         stats_repo = DailyStatsRepository(session)
+        prize_repo = PrizeRepository(session)
         
         # Получаем пользователя
         user = await user_repo.get_user_by_id(user_id)
@@ -215,6 +219,30 @@ async def spin_wheel(
         if settings.DEBUG:
             logging.debug(f"Подтверждение результата прокрутки для пользователя {user_id}: {result_value}")
         
+        # Определяем, является ли это выигрышем
+        is_win = result_value > 0
+        win_amount = result_value if is_win else 0
+        
+        # Получаем информацию о призе, если это выигрыш
+        prize_info = None
+        if is_win:
+            # Ищем приз с соответствующей стоимостью
+            prizes = await prize_repo.get_active_prizes()
+            matching_prize = None
+            for prize in prizes:
+                if prize.value == result_value:
+                    matching_prize = prize
+                    break
+            
+            if matching_prize:
+                prize_info = {
+                    "id": matching_prize.id,
+                    "name": matching_prize.name,
+                    "description": matching_prize.description,
+                    "value": matching_prize.value,
+                    "image_url": matching_prize.image_url
+                }
+        
         # Используем прокрут с проверенным результатом
         success = await user_repo.use_spin(user_id, result_value)
         if not success:
@@ -229,14 +257,18 @@ async def spin_wheel(
         # Обновляем статистику за день
         await stats_repo.update_daily_stats(result_value)
         
-        # Создаем запись об игре
-        await game_repo.create_game(user_id, str(result_value))
+        # Создаем запись об игре с информацией о призе
+        prize_id = prize_info["id"] if prize_info else None
+        await game_repo.create_game_with_prize(user_id, str(result_value), prize_id, is_win, win_amount)
         
         # Получаем обновленные данные пользователя
         updated_user = await user_repo.get_user_by_id(user_id)
         
         # Логируем успешную прокрутку
-        logging.info(f"Пользователь {user_id} успешно выполнил прокрутку и выиграл {result_value}")
+        if is_win:
+            logging.info(f"Пользователь {user_id} успешно выполнил прокрутку и выиграл {result_value} (приз: {prize_info['name'] if prize_info else 'Неизвестный приз'})")
+        else:
+            logging.info(f"Пользователь {user_id} выполнил прокрутку, но не выиграл")
         
         elapsed_time = time.time() - start_time
         logging.debug(f"Время обработки запроса прокрутки: {elapsed_time:.2f} сек.")
@@ -245,7 +277,10 @@ async def spin_wheel(
             success=True,
             tickets=updated_user.tickets,
             result=str(result_value),
-            time_until_next_spin=updated_user.get_time_until_free_spin()
+            time_until_next_spin=updated_user.get_time_until_free_spin(),
+            prize=prize_info,
+            is_win=is_win,
+            win_amount=win_amount
         )
         
     except Exception as e:
@@ -414,6 +449,46 @@ async def predict_spin_result(
         
     except Exception as e:
         logging.exception(f"Ошибка при предсказании результата прокрутки: {e}")
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
+
+# API для получения списка активных призов
+@spin_router.get("/prizes", response_model=Dict[str, Any])
+async def get_prizes(session: AsyncSession = Depends(get_session)):
+    """
+    Возвращает список активных призов.
+    
+    Args:
+        session (AsyncSession): Сессия базы данных
+    
+    Returns:
+        Dict[str, Any]: Список активных призов
+    
+    Raises:
+        HTTPException: Ошибка при обработке запроса
+    """
+    try:
+        prize_repo = PrizeRepository(session)
+        prizes = await prize_repo.get_active_prizes()
+        
+        prizes_data = []
+        for prize in prizes:
+            prizes_data.append({
+                "id": prize.id,
+                "name": prize.name,
+                "description": prize.description,
+                "value": prize.value,
+                "probability": prize.probability,
+                "image_url": prize.image_url
+            })
+        
+        return {
+            "success": True,
+            "prizes": prizes_data,
+            "total": len(prizes_data)
+        }
+        
+    except Exception as e:
+        logging.exception(f"Ошибка при получении призов: {e}")
         raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
 
 # Объединяем роутеры для экспорта

@@ -10,7 +10,12 @@ const state = {
     timerInterval: null,
     freeTicketTimerId: null,
     freeTicketTimeLeft: 0,
-    isFreeTicketTimerActive: false
+    isFreeTicketTimerActive: false,
+    prizes: [], // Список призов
+    currentPrize: null, // Текущий выигранный приз
+    giveaways: [], // Список активных розыгрышей
+    userGiveaways: [], // Розыгрыши, в которых участвует пользователь
+    sponsorChannels: [] // Список каналов-спонсоров
 };
 
 // Простая валидация initData для Telegram WebApp
@@ -42,28 +47,358 @@ function validateTelegramWebAppData(initData) {
     };
 })();
 
+// Функция для загрузки призов
+async function loadPrizes() {
+    try {
+        const response = await fetch('/api/prizes');
+        const data = await response.json();
+        
+        if (data.success) {
+            state.prizes = data.prizes;
+            console.log('Призы загружены:', state.prizes);
+            updatePrizesDisplay();
+        }
+    } catch (error) {
+        console.error('Ошибка при загрузке призов:', error);
+    }
+}
+
+// Функция для загрузки активных розыгрышей
+async function loadGiveaways() {
+    try {
+        const response = await fetch('/api/giveaways/active');
+        const giveaways = await response.json();
+        
+        state.giveaways = giveaways;
+        console.log('Розыгрыши загружены:', state.giveaways);
+        updateGiveawaysDisplay();
+    } catch (error) {
+        console.error('Ошибка при загрузке розыгрышей:', error);
+    }
+}
+
+// Функция для участия в розыгрыше
+async function joinGiveaway(giveawayId) {
+    try {
+        const response = await fetch(`/api/giveaways/${giveawayId}/join`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showSuccess('🎉 Вы успешно участвуете в розыгрыше!');
+            // Обновляем отображение
+            loadGiveaways();
+        } else {
+            showError(data.message || 'Ошибка при участии в розыгрыше');
+        }
+    } catch (error) {
+        console.error('Ошибка при участии в розыгрыше:', error);
+        showError('Ошибка при участии в розыгрыше');
+    }
+}
+
+// Функция для обновления отображения призов
+function updatePrizesDisplay() {
+    const prizesContainer = document.getElementById('prizes-container');
+    if (!prizesContainer) return;
+    
+    prizesContainer.innerHTML = '';
+    
+    state.prizes.forEach(prize => {
+        const prizeElement = document.createElement('div');
+        prizeElement.className = 'prize-item';
+        prizeElement.innerHTML = `
+            <div class="prize-image">
+                ${prize.image_url ? `<img src="${prize.image_url}" alt="${prize.name}">` : '<div class="prize-placeholder">🎁</div>'}
+            </div>
+            <div class="prize-info">
+                <h4>${prize.name}</h4>
+                <p>${prize.description || ''}</p>
+                <div class="prize-value">${prize.value} руб</div>
+            </div>
+        `;
+        prizesContainer.appendChild(prizeElement);
+    });
+}
+
+// Функция для обновления отображения розыгрышей
+function updateGiveawaysDisplay() {
+    const giveawaysList = document.getElementById('giveaways-list');
+    const giveawaysEmpty = document.getElementById('giveaways-empty');
+    
+    if (!giveawaysList || !giveawaysEmpty) return;
+
+    if (state.giveaways.length === 0) {
+        giveawaysList.style.display = 'none';
+        giveawaysEmpty.style.display = 'block';
+        return;
+    }
+
+    giveawaysList.style.display = 'block';
+    giveawaysEmpty.style.display = 'none';
+
+    giveawaysList.innerHTML = state.giveaways.map(giveaway => `
+        <div class="giveaway-item">
+            <div class="giveaway-header">
+                <h3>🎉 ${giveaway.title}</h3>
+                <span class="giveaway-status status-${giveaway.status}">${getStatusText(giveaway.status)}</span>
+            </div>
+            <div class="giveaway-content">
+                <p class="giveaway-description">${giveaway.description || ''}</p>
+                <div class="giveaway-prize">
+                    <span class="prize-icon">🎁</span>
+                    <span class="prize-text">${giveaway.prize}</span>
+                </div>
+                <div class="giveaway-actions">
+                    <button class="btn-join-giveaway" onclick="joinGiveaway(${giveaway.id})">
+                        Участвовать
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Функция для получения текста статуса
+function getStatusText(status) {
+    const statusMap = {
+        'draft': 'Черновик',
+        'active': 'Активен',
+        'finished': 'Завершен'
+    };
+    return statusMap[status] || status;
+}
+
+// Функция для загрузки каналов-спонсоров
+async function loadSponsorChannels() {
+    try {
+        console.log('Загружаем каналы-спонсоры...');
+        const response = await fetch('/api/subscription/channels');
+        const channels = await response.json();
+        
+        state.sponsorChannels = channels;
+        console.log('Каналы-спонсоры загружены:', state.sponsorChannels);
+        updateSponsorChannelsDisplay();
+    } catch (error) {
+        console.error('Ошибка при загрузке каналов-спонсоров:', error);
+        // Устанавливаем пустой массив, чтобы не блокировать страницу
+        state.sponsorChannels = [];
+        updateSponsorChannelsDisplay();
+    }
+}
+
+// Функция для обновления отображения каналов-спонсоров
+function updateSponsorChannelsDisplay() {
+    const sponsorChannelsLink = document.getElementById('sponsor-channels-link');
+    if (!sponsorChannelsLink) return;
+
+    if (state.sponsorChannels.length === 0) {
+        sponsorChannelsLink.textContent = 'Нет каналов';
+        sponsorChannelsLink.style.pointerEvents = 'none';
+        sponsorChannelsLink.style.opacity = '0.5';
+        return;
+    }
+
+    // Создаем список каналов
+    const channelsList = state.sponsorChannels.map(channel => 
+        `• ${channel.title} (${channel.id})`
+    ).join('\n');
+
+    // Добавляем обработчик клика
+    sponsorChannelsLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSponsorChannelsModal();
+    });
+}
+
+// Функция для показа модального окна с каналами-спонсорами
+function showSponsorChannelsModal() {
+    const modal = document.createElement('div');
+    modal.className = 'prize-modal';
+    modal.innerHTML = `
+        <div class="prize-modal-content">
+            <div class="prize-modal-header">
+                <h2>📢 Каналы-спонсоры</h2>
+                <button class="prize-modal-close">&times;</button>
+            </div>
+            <div class="prize-modal-body">
+                <p>Подпишитесь на наши каналы-спонсоры для участия в розыгрышах:</p>
+                <div class="sponsor-channels-list">
+                    ${state.sponsorChannels.map(channel => `
+                        <div class="sponsor-channel-item">
+                            <h4>${channel.title}</h4>
+                            <a href="${channel.url}" target="_blank" class="channel-link">
+                                ${channel.id}
+                            </a>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="prize-modal-footer">
+                <button class="prize-modal-ok">Понятно</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Обработчики для закрытия модального окна
+    modal.querySelector('.prize-modal-close').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    modal.querySelector('.prize-modal-ok').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    // Закрытие по клику вне модального окна
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
+}
+
+// Функция для отображения выигранного приза
+function showPrizeWin(prize) {
+    if (!prize) return;
+    
+    // Создаем модальное окно для показа приза
+    const modal = document.createElement('div');
+    modal.className = 'prize-modal';
+    modal.innerHTML = `
+        <div class="prize-modal-content">
+            <div class="prize-modal-header">
+                <h2>🎉 Поздравляем! 🎉</h2>
+                <button class="prize-modal-close">&times;</button>
+            </div>
+            <div class="prize-modal-body">
+                <div class="prize-image-large">
+                    ${prize.image_url ? `<img src="${prize.image_url}" alt="${prize.name}">` : '<div class="prize-placeholder-large">🎁</div>'}
+                </div>
+                <h3>${prize.name}</h3>
+                <p>${prize.description || ''}</p>
+                <div class="prize-value-large">${prize.value} руб</div>
+            </div>
+            <div class="prize-modal-footer">
+                <button class="prize-modal-ok">Отлично!</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Обработчики для закрытия модального окна
+    modal.querySelector('.prize-modal-close').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    modal.querySelector('.prize-modal-ok').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    // Закрытие по клику вне модального окна
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, starting initialization...');
+    
     // Кэшируем все DOM-элементы при загрузке страницы
     cacheDOM();
     
-    // Значения для сегментов колеса (все сегменты одного основного цвета)
+    // Скрываем прелоадер
+    const preloader = document.querySelector('.app-preloader');
+    if (preloader) {
+        preloader.classList.add('hidden');
+        setTimeout(() => {
+            preloader.style.display = 'none';
+        }, 300);
+    }
+    
+    console.log('Preloader hidden, page should be visible now');
+    
+    // Проверяем, есть ли Telegram WebApp данные
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+        console.log('Telegram WebApp detected with initData');
+        // Загружаем призы, розыгрыши и каналы
+        loadPrizes();
+        loadGiveaways();
+        loadSponsorChannels();
+    } else {
+        console.log('No Telegram WebApp detected or no initData, loading without API calls');
+        // Загружаем только каналы (они не требуют авторизации)
+        loadSponsorChannels();
+        
+        // Устанавливаем заглушки для тестирования
+        state.prizes = [];
+        state.giveaways = [];
+        updatePrizesDisplay();
+        updateGiveawaysDisplay();
+    }
+    
+    // Значения для сегментов колеса (розовая тема)
     const sectors = [
-        { value: 300, color: '#C4B5FD' },  // Светло-фиолетовый
-        { value: 0, color: '#4C1D95' },    // Тёмно-фиолетовый
-        { value: 1000, color: '#C4B5FD' }, // Светло-фиолетовый
-        { value: 0, color: '#4C1D95' },    // Тёмно-фиолетовый
-        { value: 2000, color: '#C4B5FD' }, // Светло-фиолетовый
-        { value: 0, color: '#4C1D95' },    // Тёмно-фиолетовый
-        { value: 300, color: '#C4B5FD' },  // Светло-фиолетовый
-        { value: 0, color: '#4C1D95' },    // Тёмно-фиолетовый
-        { value: 500, color: '#C4B5FD' },  // Светло-фиолетовый
-        { value: 0, color: '#4C1D95' },    // Тёмно-фиолетовый
-        { value: 300, color: '#C4B5FD' },  // Светло-фиолетовый
-        { value: 0, color: '#4C1D95' },    // Тёмно-фиолетовый
+        { value: 300, color: '#F8BBD9' },  // Светло-розовый
+        { value: 0, color: '#C2185B' },    // Тёмно-розовый
+        { value: 1000, color: '#F8BBD9' }, // Светло-розовый
+        { value: 0, color: '#C2185B' },    // Тёмно-розовый
+        { value: 2000, color: '#F8BBD9' }, // Светло-розовый
+        { value: 0, color: '#C2185B' },    // Тёмно-розовый
+        { value: 300, color: '#F8BBD9' },  // Светло-розовый
+        { value: 0, color: '#C2185B' },    // Тёмно-розовый
+        { value: 500, color: '#F8BBD9' },  // Светло-розовый
+        { value: 0, color: '#C2185B' },    // Тёмно-розовый
+        { value: 300, color: '#F8BBD9' },  // Светло-розовый
+        { value: 0, color: '#C2185B' },    // Тёмно-розовый
     ];
     
     // Инициализация приложения
     initApp();
+    
+    // Принудительно создаем колесо через небольшую задержку
+    setTimeout(() => {
+        console.log('Принудительно создаем колесо...');
+        createWheel();
+    }, 1000);
+    
+    // Принудительно настраиваем обработчики через задержку
+    setTimeout(() => {
+        console.log('Принудительно настраиваем обработчики...');
+        setupEventListeners();
+        
+        // Альтернативный способ - привязываем обработчики напрямую
+        const navItems = document.querySelectorAll('.nav-item');
+        console.log('Альтернативно найдено элементов навигации:', navItems.length);
+        
+        navItems.forEach((item, index) => {
+            console.log(`Альтернативно настраиваем обработчик для элемента ${index}:`, item);
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Клик по элементу навигации:', item);
+                
+                const tabId = item.getAttribute('data-tab');
+                console.log('Переключаем на вкладку:', tabId);
+                
+                // Обновляем активный элемент меню
+                navItems.forEach(navItem => navItem.classList.remove('active'));
+                item.classList.add('active');
+                
+                // Показываем соответствующую вкладку
+                const tabContents = document.querySelectorAll('.tab-content');
+                tabContents.forEach(tab => {
+                    const isVisible = tab.id === tabId;
+                    tab.classList.toggle('active', isVisible);
+                    console.log(`Вкладка ${tab.id} видима:`, isVisible);
+                });
+            });
+        });
+    }, 1500);
     
     // Функция для кэширования всех DOM-элементов
     function cacheDOM() {
@@ -85,6 +420,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Получаем элементы прелоадера
         DOM.appPreloader = document.querySelector('.app-preloader');
         DOM.appContainer = document.querySelector('.app-container');
+        
+        // Отладочная информация
+        console.log('DOM элементы закэшированы:', {
+            navItems: DOM.navItems.length,
+            tabContents: DOM.tabContents.length,
+            wheel: !!DOM.wheel,
+            spinbutton: !!DOM.spinbutton
+        });
     }
     
     // Функция инициализации приложения
@@ -175,8 +518,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Настройка всех обработчиков событий
     function setupEventListeners() {
+        console.log('Настраиваем обработчики событий...');
+        console.log('Найдено элементов навигации:', DOM.navItems.length);
+        console.log('Найдено вкладок:', DOM.tabContents.length);
+        
         // Навигация по вкладкам
-        DOM.navItems.forEach(item => {
+        if (DOM.navItems && DOM.navItems.length > 0) {
+            DOM.navItems.forEach((item, index) => {
+                console.log(`Настраиваем обработчик для элемента ${index}:`, item);
             item.addEventListener('click', () => {
                 const tabId = item.getAttribute('data-tab');
                 
@@ -200,6 +549,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         });
+        } else {
+            console.error('Элементы навигации не найдены!');
+        }
         
         // Копирование реферальной ссылки
         if (DOM.copylink) {
@@ -1036,6 +1388,11 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(message);
     }
     
+    // Функция для отображения успешного сообщения
+    function showSuccess(message) {
+        alert(message);
+    }
+    
     // Функция для создания колеса с правильно расположенными цифрами
     function createWheel() {
         const segmentCount = sectors.length;
@@ -1043,15 +1400,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const wheelRadius = 150; // Радиус колеса
         const labelRadius = 90; // Радиус для размещения текста (уменьшен для лучшего размещения)
         
-        // Создаем SVG для колеса, если его еще нет
-        let svg = wheel.querySelector('svg');
-        if (!svg) {
-            svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            svg.setAttribute("width", "300");
-            svg.setAttribute("height", "300");
-            svg.setAttribute("viewBox", "0 0 300 300");
-            wheel.appendChild(svg);
+        // Находим контейнер колеса
+        const wheel = document.querySelector('.wheel-container');
+        if (!wheel) {
+            console.error('Контейнер колеса не найден!');
+            return;
         }
+        
+        console.log('Создаем колесо в контейнере:', wheel);
+        
+        // Очищаем контейнер и создаем новый SVG
+        wheel.innerHTML = '';
+        
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("width", "300");
+        svg.setAttribute("height", "300");
+        svg.setAttribute("viewBox", "0 0 300 300");
+        svg.style.display = "block";
+        svg.style.margin = "0 auto";
+        wheel.appendChild(svg);
+        
+        console.log('SVG создан:', svg);
         
         // Создаем фильтр для текстовой тени
         const filterId = "textShadow";
@@ -1083,20 +1452,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const endRad = (endAngle - 90) * Math.PI / 180;
             const midRad = (midAngle - 90) * Math.PI / 180;
             
-            // Координаты для построения пути сектора
-            const x1 = wheelRadius + wheelRadius * Math.cos(startRad);
-            const y1 = wheelRadius + wheelRadius * Math.sin(startRad);
-            const x2 = wheelRadius + wheelRadius * Math.cos(endRad);
-            const y2 = wheelRadius + wheelRadius * Math.sin(endRad);
+            // Координаты для построения пути сектора (центр SVG = 150, 150)
+            const centerX = 150;
+            const centerY = 150;
+            const x1 = centerX + wheelRadius * Math.cos(startRad);
+            const y1 = centerY + wheelRadius * Math.sin(startRad);
+            const x2 = centerX + wheelRadius * Math.cos(endRad);
+            const y2 = centerY + wheelRadius * Math.sin(endRad);
             
             // Создаем путь SVG для сектора
             const largeArcFlag = segmentAngle > 180 ? 1 : 0;
-            const pathData = `
-                M ${wheelRadius},${wheelRadius}
-                L ${x1},${y1}
-                A ${wheelRadius},${wheelRadius} 0 ${largeArcFlag} 1 ${x2},${y2}
-                Z
-            `;
+            const pathData = `M ${centerX},${centerY} L ${x1},${y1} A ${wheelRadius},${wheelRadius} 0 ${largeArcFlag} 1 ${x2},${y2} Z`;
             
             segment.setAttribute("d", pathData);
             segment.setAttribute("fill", sectors[i].color);
@@ -1107,8 +1473,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Добавляем линии от центра к краям
             const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            line.setAttribute("x1", wheelRadius);
-            line.setAttribute("y1", wheelRadius);
+            line.setAttribute("x1", centerX);
+            line.setAttribute("y1", centerY);
             line.setAttribute("x2", x1);
             line.setAttribute("y2", y1);
             line.setAttribute("stroke", "#8B5CF6"); // Фиолетовый цвет для линий
@@ -1118,8 +1484,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
             
             // Вычисляем позицию для текста - в центре сегмента
-            const textX = wheelRadius + labelRadius * Math.cos(midRad);
-            const textY = wheelRadius + labelRadius * Math.sin(midRad);
+            const textX = centerX + labelRadius * Math.cos(midRad);
+            const textY = centerY + labelRadius * Math.sin(midRad);
             
             text.setAttribute("x", textX);
             text.setAttribute("y", textY);
@@ -1235,6 +1601,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Обновляем таймер
             if (data.time_until_next_spin && DOM.timer) {
                 DOM.timer.textContent = data.time_until_next_spin;
+            }
+            
+            // Обрабатываем выигранный приз
+            if (data.is_win && data.prize) {
+                state.currentPrize = data.prize;
+                showPrizeWin(data.prize);
             }
             
             return data;

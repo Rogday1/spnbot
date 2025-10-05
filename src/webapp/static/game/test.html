@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #F8BBD9 0%, #E91E63 50%, #C2185B 100%);
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 40px 0;
+        }
+        .nav-item {
+            background: rgba(255,255,255,0.2);
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .nav-item:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .content {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎰 Spin Bot</h1>
+        <p>Добро пожаловать в мир азарта и призов!</p>
+        
+        <div class="nav">
+            <div class="nav-item" onclick="showContent('wheel')">🎰 Колесо</div>
+            <div class="nav-item" onclick="showContent('leaders')">🏆 Лидеры</div>
+            <div class="nav-item" onclick="showContent('about')">ℹ️ О боте</div>
+        </div>
+        
+        <div class="content" id="content">
+            <h2>🎰 Колесо Фортуны</h2>
+            <p>Здесь будет колесо фортуны с розовой темой!</p>
+            <div style="width: 200px; height: 200px; background: linear-gradient(45deg, #F8BBD9, #E91E63); border-radius: 50%; margin: 20px auto; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+                🎰
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showContent(type) {
+            const content = document.getElementById('content');
+            if (type === 'wheel') {
+                content.innerHTML = `
+                    <h2>🎰 Колесо Фортуны</h2>
+                    <p>Здесь будет колесо фортуны с розовой темой!</p>
+                    <div style="width: 200px; height: 200px; background: linear-gradient(45deg, #F8BBD9, #E91E63); border-radius: 50%; margin: 20px auto; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+                        🎰
+                    </div>
+                `;
+            } else if (type === 'leaders') {
+                content.innerHTML = `
+                    <h2>🏆 Таблица Лидеров</h2>
+                    <p>Здесь будет таблица лидеров!</p>
+                `;
+            } else if (type === 'about') {
+                content.innerHTML = `
+                    <h2>ℹ️ О боте</h2>
+                    <p>Spin Bot - это уникальное колесо фортуны!</p>
+                    <p>🎁 Реальные призы</p>
+                    <p>🎉 Розыгрыши</p>
+                    <p>👥 Реферальная программа</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

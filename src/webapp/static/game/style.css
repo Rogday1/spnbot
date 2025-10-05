@@ -1,44 +1,44 @@
 :root {
-    --primary-color: #4a6bff;
-    --secondary-color: #6c7684;
-    --background-color: #f5f6fa;
+    --primary-color: #E91E63;
+    --secondary-color: #AD1457;
+    --background-color: #FCE4EC;
     --card-background: #ffffff;
-    --text-color: #212529;
-    --text-secondary: #6c7684;
-    --border-color: #e1e4e8;
-    --success-color: #28a745;
-    --error-color: #dc3545;
-    --warning-color: #ffc107;
-    --primary-light: #B888FF;
-    --primary-dark: #6A1B9A;
-    --accent-color: #FF00FF;
-    --text-light: #4A148C;
-    --bg-color: #F5F5F5;
+    --text-color: #2E2E2E;
+    --text-secondary: #8E8E8E;
+    --border-color: #F8BBD9;
+    --success-color: #4CAF50;
+    --error-color: #F44336;
+    --warning-color: #FF9800;
+    --primary-light: #F8BBD9;
+    --primary-dark: #C2185B;
+    --accent-color: #FF4081;
+    --text-light: #880E4F;
+    --bg-color: #FCE4EC;
     --white: #FFFFFF;
     --black: #000000;
-    --shadow: rgba(0, 0, 0, 0.2);
+    --shadow: rgba(233, 30, 99, 0.2);
     --nav-height: 70px;
-    --wheel-marker-color: #e74c3c;
-    --wheel-border-color: #4a6bff;
-    --wheel-center-color: #212529;
+    --wheel-marker-color: #E91E63;
+    --wheel-border-color: #E91E63;
+    --wheel-center-color: #2E2E2E;
     --border-radius: 12px;
     --container-padding: 20px;
 }
 
 [data-theme="dark"] {
-    --primary-color: #4a6bff;
-    --secondary-color: #9aa0a6;
-    --background-color: #1f1f1f;
-    --card-background: #2d2d2d;
-    --text-color: #e8eaed;
-    --text-secondary: #9aa0a6;
-    --border-color: #3c4043;
-    --success-color: #81c995;
-    --error-color: #f28b82;
-    --warning-color: #fdd663;
-    --wheel-marker-color: #e74c3c;
-    --wheel-border-color: #4a6bff;
-    --wheel-center-color: #e8eaed;
+    --primary-color: #F48FB1;
+    --secondary-color: #EC407A;
+    --background-color: #1A1A1A;
+    --card-background: #2D2D2D;
+    --text-color: #E8E8E8;
+    --text-secondary: #B0B0B0;
+    --border-color: #4A4A4A;
+    --success-color: #81C784;
+    --error-color: #EF5350;
+    --warning-color: #FFB74D;
+    --wheel-marker-color: #F48FB1;
+    --wheel-border-color: #F48FB1;
+    --wheel-center-color: #E8E8E8;
 }
 
 * {
@@ -1716,4 +1716,522 @@ button.disabled {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Стили для призов */
+#prizes-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    padding: 20px;
+}
+
+.prize-item {
+    background: var(--card-background);
+    border-radius: var(--border-radius);
+    padding: 15px;
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: transform 0.2s ease;
+    border: 1px solid var(--border-color);
+}
+
+.prize-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow);
+}
+
+.prize-image {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.prize-image img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.prize-placeholder {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin: 0 auto;
+}
+
+.prize-info h4 {
+    color: var(--text-color);
+    font-size: 16px;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.prize-info p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.prize-value {
+    color: var(--success-color);
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Модальное окно для выигранного приза */
+.prize-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+.prize-modal-content {
+    background: var(--card-background);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    animation: slideUp 0.3s ease;
+    position: relative;
+}
+
+.prize-modal-header {
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.prize-modal-header h2 {
+    color: var(--text-color);
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.prize-modal-close {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: var(--error-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.prize-modal-body {
+    margin-bottom: 20px;
+}
+
+.prize-image-large {
+    margin-bottom: 20px;
+}
+
+.prize-image-large img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px var(--shadow);
+}
+
+.prize-placeholder-large {
+    width: 120px;
+    height: 120px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    margin: 0 auto;
+    box-shadow: 0 4px 12px var(--shadow);
+}
+
+.prize-modal-body h3 {
+    color: var(--text-color);
+    font-size: 22px;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.prize-modal-body p {
+    color: var(--text-secondary);
+    font-size: 16px;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.prize-value-large {
+    color: var(--success-color);
+    font-size: 28px;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.prize-modal-footer {
+    text-align: center;
+}
+
+.prize-modal-ok {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 12px 30px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.prize-modal-ok:hover {
+    transform: translateY(-2px);
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Стили для розыгрышей */
+.giveaway-item {
+    background: var(--card-background);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.giveaway-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px var(--shadow);
+}
+
+.giveaway-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.giveaway-header h3 {
+    color: var(--text-color);
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.giveaway-status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-draft {
+    background: #FFF3E0;
+    color: #F57C00;
+}
+
+.status-active {
+    background: #E8F5E8;
+    color: #2E7D32;
+}
+
+.status-finished {
+    background: #FFEBEE;
+    color: #C62828;
+}
+
+.giveaway-content {
+    margin-bottom: 16px;
+}
+
+.giveaway-description {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.giveaway-prize {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.prize-icon {
+    font-size: 20px;
+}
+
+.prize-text {
+    color: var(--text-color);
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.giveaway-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-join-giveaway {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+}
+
+.btn-join-giveaway:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow);
+}
+
+.btn-join-giveaway:active {
+    transform: translateY(0);
+}
+
+.btn-join-giveaway:disabled {
+    background: var(--text-secondary);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Стили для пустого состояния розыгрышей */
+.leaders-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.leaders-empty .material-icons-round {
+    font-size: 48px;
+    color: var(--primary-light);
+    margin-bottom: 16px;
+    display: block;
+}
+
+/* Стили для страницы "О боте" */
+.about-section {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.about-section h2 {
+    color: var(--primary-color);
+    font-size: 24px;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.about-section h3 {
+    color: var(--text-color);
+    font-size: 18px;
+    margin: 24px 0 12px 0;
+    border-bottom: 2px solid var(--primary-light);
+    padding-bottom: 8px;
+}
+
+.about-section p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.features-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+}
+
+.features-list li {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    color: var(--text-color);
+    font-weight: 500;
+    transition: transform 0.2s ease;
+}
+
+.features-list li:hover {
+    transform: translateX(8px);
+    border-color: var(--primary-color);
+}
+
+.channels-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.channel-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.channel-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px var(--shadow);
+}
+
+.channel-item .material-icons-round {
+    font-size: 32px;
+    color: var(--primary-color);
+    margin-top: 4px;
+}
+
+.channel-info h4 {
+    color: var(--text-color);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+}
+
+.channel-info p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin: 0 0 12px 0;
+}
+
+.channel-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 8px 16px;
+    background: var(--primary-light);
+    border-radius: 20px;
+    transition: all 0.2s ease;
+    display: inline-block;
+}
+
+.channel-link:hover {
+    background: var(--primary-color);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.legal-info {
+    background: #FFF3E0;
+    border: 1px solid #FFB74D;
+    border-radius: var(--border-radius);
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.legal-info p {
+    color: #E65100;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.legal-info p:last-child {
+    margin-bottom: 0;
+}
+
+.contact-info {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-top: 24px;
+    text-align: center;
+}
+
+.contact-info h3 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+}
+
+.contact-info p {
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Стили для модального окна с каналами-спонсорами */
+.sponsor-channels-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.sponsor-channel-item {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    text-align: center;
+}
+
+.sponsor-channel-item h4 {
+    color: var(--text-color);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+}
+
+.sponsor-channel-item .channel-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 8px 16px;
+    background: var(--primary-light);
+    border-radius: 20px;
+    transition: all 0.2s ease;
+    display: inline-block;
+}
+
+.sponsor-channel-item .channel-link:hover {
+    background: var(--primary-color);
+    color: white;
+    transform: translateY(-1px);
 }
